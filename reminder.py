@@ -111,7 +111,8 @@ def parse_contest_date_to_epoch(date_str: str) -> int:
 
 def format_contest_time(start_epoch: int, duration: int) -> str:
     """コンテスト開始時刻と終了時刻を日本時間でフォーマット"""
-    from datetime import datetime, timedelta, timezone
+    if start_epoch == 0:
+        return "開催時間未定"
     
     # JST timezone
     jst = timezone(timedelta(hours=9))
@@ -122,16 +123,49 @@ def format_contest_time(start_epoch: int, duration: int) -> str:
     return f"{start_time.strftime('%Y/%m/%d %H:%M')} - {end_time.strftime('%H:%M')} JST"
 
 
+def format_date_string(date_str: str) -> str:
+    """AtCoderから取得した日時文字列を見やすい形式に変換"""
+    try:
+        # 例: "2025-07-12(土) 21:00" → "2025/07/12(土) 21:00 - 22:40 JST"
+        date_match = re.search(r'(\d{4}-\d{2}-\d{2})\(([^)]+)\)\s+(\d{1,2}):(\d{2})', date_str)
+        if date_match:
+            date_part = date_match.group(1).replace('-', '/')
+            day_of_week = date_match.group(2)
+            hour = date_match.group(3)
+            minute = date_match.group(4)
+            
+            # 開始時刻
+            start_time_str = f"{date_part}({day_of_week}) {hour}:{minute}"
+            
+            # 終了時刻を計算（100分後）
+            start_hour = int(hour)
+            start_minute = int(minute)
+            total_minutes = start_hour * 60 + start_minute + 100  # 100分後
+            end_hour = (total_minutes // 60) % 24
+            end_minute = total_minutes % 60
+            
+            end_time_str = f"{end_hour:02d}:{end_minute:02d}"
+            
+            return f"{start_time_str} - {end_time_str} JST"
+    except Exception as e:
+        logger.warning(f"日時文字列のフォーマットに失敗しました: {date_str}, エラー: {e}")
+    
+    # フォーマットに失敗した場合は元の文字列を返す
+    return date_str
+
+
 def create_reminder_message(contest_info: dict, message_type: str) -> str:
     """リマインダーメッセージを生成"""
     contest_name = contest_info["title"]
     contest_id = contest_info["contest_id"]
     contest_url = contest_info.get("contest_url", f"https://atcoder.jp/contests/{contest_id}")
     
-    # スクレイピングで取得した場合はdate_strを優先
+    # 開催時間を見やすい形式でフォーマット
     if contest_info.get("date_str"):
-        contest_time = contest_info["date_str"]
+        # スクレイピングで取得した生の文字列を使用
+        contest_time = format_date_string(contest_info["date_str"])
     else:
+        # epoch時間から変換
         contest_time = format_contest_time(
             contest_info["start_epoch_second"], 
             contest_info["duration_second"]
