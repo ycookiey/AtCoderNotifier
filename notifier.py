@@ -16,7 +16,7 @@ logger.setLevel(INFO)
 # --- 設定項目 ---
 # GitHub Actionsの環境変数から取得
 ATCODER_USER_ID = os.environ.get("ATCODER_USER_ID")
-DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
+DISCORD_WEBHOOK_URL_NOTIFIER = os.environ.get("DISCORD_WEBHOOK_URL_NOTIFIER")
 
 # --- 定数 ---
 CONTESTS_API_URL = "https://kenkoooo.com/atcoder/resources/contests.json"
@@ -300,7 +300,7 @@ def send_discord_notification(message: str):
     """Discord Webhookに通知を送信する"""
     payload = {"content": message}
     try:
-        res = requests.post(DISCORD_WEBHOOK_URL, json=payload)
+        res = requests.post(DISCORD_WEBHOOK_URL_NOTIFIER, json=payload)
         res.raise_for_status()
         logger.info("Discordへの通知に成功しました。")
     except requests.exceptions.RequestException as e:
@@ -309,9 +309,9 @@ def send_discord_notification(message: str):
 
 def main():
     """メイン処理"""
-    if not ATCODER_USER_ID or not DISCORD_WEBHOOK_URL:
+    if not ATCODER_USER_ID or not DISCORD_WEBHOOK_URL_NOTIFIER:
         logger.error(
-            "環境変数 ATCODER_USER_ID または DISCORD_WEBHOOK_URL が設定されていません。"
+            "環境変数 ATCODER_USER_ID または DISCORD_WEBHOOK_URL_NOTIFIER が設定されていません。"
         )
         sys.exit(1)
 

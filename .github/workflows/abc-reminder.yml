@@ -57,7 +57,7 @@ jobs:
     - name: Send reminder notification
       if: steps.get_abc.outputs.success == 'true'
       env:
-        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        DISCORD_WEBHOOK_URL_REMINDER: ${{ secrets.DISCORD_WEBHOOK_URL_REMINDER }}
       run: |
         python -c "
         import os
@@ -85,7 +85,7 @@ jobs:
             message = f'📢 {contest_name}のリマインドです！\\n📅 開催時間: {contest_date}\\n🔗 {contest_url}'
         
         # Discord通知
-        discord_url = os.environ.get('DISCORD_WEBHOOK_URL')
+        discord_url = os.environ.get('DISCORD_WEBHOOK_URL_REMINDER')
         if discord_url:
             payload = {'content': message}
             try:
