@@ -90,7 +90,7 @@ def get_latest_abc_contest() -> dict | None:
 def parse_contest_date_to_epoch(date_str: str) -> int:
     """コンテスト日時文字列をepoch時間に変換"""
     try:
-        # 例: "2025-07-12(土) 21:00" の形式をパース
+        # パターン1: "2025-07-12(土) 21:00" の形式をパース
         date_match = re.search(r'(\d{4}-\d{2}-\d{2})\([^)]+\)\s+(\d{1,2}):(\d{2})', date_str)
         if date_match:
             date_part = date_match.group(1)
@@ -103,6 +103,21 @@ def parse_contest_date_to_epoch(date_str: str) -> int:
             contest_datetime = contest_datetime.replace(tzinfo=jst)
             
             return int(contest_datetime.timestamp())
+        
+        # パターン2: "2025-07-12 21:00:00+0900" の形式をパース
+        iso_match = re.search(r'(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2}):\d{2}[+-]\d{4}', date_str)
+        if iso_match:
+            date_part = iso_match.group(1)
+            hour = int(iso_match.group(2))
+            minute = int(iso_match.group(3))
+            
+            # JST timezone
+            jst = timezone(timedelta(hours=9))
+            contest_datetime = datetime.strptime(f"{date_part} {hour:02d}:{minute:02d}", '%Y-%m-%d %H:%M')
+            contest_datetime = contest_datetime.replace(tzinfo=jst)
+            
+            return int(contest_datetime.timestamp())
+            
     except Exception as e:
         logger.warning(f"日時のパースに失敗しました: {date_str}, エラー: {e}")
         
@@ -130,7 +145,7 @@ def format_contest_time(start_epoch: int, duration: int) -> str:
 def format_date_string(date_str: str) -> str:
     """AtCoderから取得した日時文字列を見やすい形式に変換"""
     try:
-        # 例: "2025-07-12(土) 21:00" → "2025/07/12(土) 21:00 - 22:40 JST"
+        # パターン1: "2025-07-12(土) 21:00" 形式
         date_match = re.search(r'(\d{4}-\d{2}-\d{2})\(([^)]+)\)\s+(\d{1,2}):(\d{2})', date_str)
         if date_match:
             date_part = date_match.group(1).replace('-', '/')
@@ -151,6 +166,34 @@ def format_date_string(date_str: str) -> str:
             end_time_str = f"{end_hour:02d}:{end_minute:02d}"
             
             return f"{start_time_str} - {end_time_str}"
+        
+        # パターン2: "2025-07-12 21:00:00+0900" 形式
+        iso_match = re.search(r'(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2}):\d{2}[+-]\d{4}', date_str)
+        if iso_match:
+            date_part = iso_match.group(1).replace('-', '/')
+            hour = iso_match.group(2)
+            minute = iso_match.group(3)
+            
+            # 曜日を計算
+            from datetime import datetime
+            year, month, day = map(int, iso_match.group(1).split('-'))
+            weekdays = ['月', '火', '水', '木', '金', '土', '日']
+            day_of_week = weekdays[datetime(year, month, day).weekday()]
+            
+            # 開始時刻
+            start_time_str = f"{date_part}({day_of_week}) {hour}:{minute}"
+            
+            # 終了時刻を計算（100分後）
+            start_hour = int(hour)
+            start_minute = int(minute)
+            total_minutes = start_hour * 60 + start_minute + 100  # 100分後
+            end_hour = (total_minutes // 60) % 24
+            end_minute = total_minutes % 60
+            
+            end_time_str = f"{end_hour:02d}:{end_minute:02d}"
+            
+            return f"{start_time_str} - {end_time_str}"
+            
     except Exception as e:
         logger.warning(f"日時文字列のフォーマットに失敗しました: {date_str}, エラー: {e}")
     
