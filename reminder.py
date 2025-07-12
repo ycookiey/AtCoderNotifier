@@ -120,7 +120,11 @@ def format_contest_time(start_epoch: int, duration: int) -> str:
     start_time = datetime.fromtimestamp(start_epoch, tz=jst)
     end_time = start_time + timedelta(seconds=duration)
     
-    return f"{start_time.strftime('%Y/%m/%d %H:%M')} - {end_time.strftime('%H:%M')} JST"
+    # 曜日を追加
+    weekdays = ['月', '火', '水', '木', '金', '土', '日']
+    weekday = weekdays[start_time.weekday()]
+    
+    return f"{start_time.strftime('%Y/%m/%d')}({weekday}) {start_time.strftime('%H:%M')} - {end_time.strftime('%H:%M')}"
 
 
 def format_date_string(date_str: str) -> str:
@@ -146,7 +150,7 @@ def format_date_string(date_str: str) -> str:
             
             end_time_str = f"{end_hour:02d}:{end_minute:02d}"
             
-            return f"{start_time_str} - {end_time_str} JST"
+            return f"{start_time_str} - {end_time_str}"
     except Exception as e:
         logger.warning(f"日時文字列のフォーマットに失敗しました: {date_str}, エラー: {e}")
     
