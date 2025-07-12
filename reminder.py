@@ -1,9 +1,10 @@
 import os
 import sys
 import requests
-import json
+import re
+from bs4 import BeautifulSoup
 from logging import getLogger, StreamHandler, INFO
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 # ロガーの設定
 logger = getLogger(__name__)
@@ -17,46 +18,95 @@ logger.setLevel(INFO)
 DISCORD_WEBHOOK_URLS_REMINDER = os.environ.get("DISCORD_WEBHOOK_URLS_REMINDER", "")
 
 # --- 定数 ---
-CONTESTS_API_URL = "https://kenkoooo.com/atcoder/resources/contests.json"
+ATCODER_CONTESTS_URL = "https://atcoder.jp/contests/"
 
 
 def get_latest_abc_contest() -> dict | None:
-    """kenkoooo APIから最新のAtCoder Beginner Contestの情報を取得する"""
+    """AtCoderコンテスト一覧ページから最新のABCコンテストの情報を取得する"""
     try:
-        res = requests.get(CONTESTS_API_URL)
+        res = requests.get(ATCODER_CONTESTS_URL, timeout=10)
         res.raise_for_status()
-        contests = res.json()
+        
+        soup = BeautifulSoup(res.content, 'html.parser')
+        
+        # 開催予定のコンテストテーブルを探す
+        upcoming_table = soup.find('div', id='contest-table-upcoming')
+        if not upcoming_table:
+            logger.error("開催予定のコンテストテーブルが見つかりませんでした。")
+            return None
+            
+        table = upcoming_table.find('table')
+        if not table:
+            logger.error("コンテストテーブルが見つかりませんでした。")
+            return None
+        
+        tbody = table.find('tbody')
+        if not tbody:
+            logger.error("テーブルボディが見つかりませんでした。")
+            return None
+            
+        rows = tbody.find_all('tr')
+        
+        for row in rows:
+            cells = row.find_all('td')
+            if len(cells) >= 2:
+                # コンテスト名のリンクを取得
+                contest_link = cells[1].find('a')
+                if contest_link:
+                    contest_name = contest_link.get_text(strip=True)
+                    contest_url = contest_link.get('href')
+                    
+                    # ABCコンテストかチェック
+                    if re.search(r'AtCoder Beginner Contest \d+|ABC\d+', contest_name, re.IGNORECASE):
+                        # 日時を取得
+                        date_cell = cells[0].get_text(strip=True)
+                        contest_id = contest_url.split('/')[-1] if contest_url else None
+                        
+                        # 日時をパースしてepoch時間に変換
+                        start_epoch = parse_contest_date_to_epoch(date_cell)
+                        
+                        logger.info(f"最新のABC: {contest_id} ({contest_name})")
+                        
+                        return {
+                            "contest_id": contest_id,
+                            "title": contest_name,
+                            "start_epoch_second": start_epoch,
+                            "duration_second": 6000,  # 100分 = 6000秒（デフォルト）
+                            "date_str": date_cell,
+                            "contest_url": f"https://atcoder.jp{contest_url}" if contest_url else None
+                        }
+        
+        logger.info("開催予定のABCコンテストが見つかりませんでした。")
+        return None
+        
     except requests.exceptions.RequestException as e:
         logger.error(f"コンテスト情報の取得に失敗しました: {e}")
         return None
-    except json.JSONDecodeError as e:
-        logger.error(f"JSONの解析に失敗しました: {e}")
+    except Exception as e:
+        logger.error(f"コンテスト情報の解析に失敗しました: {e}")
         return None
 
-    # AtCoder Beginner Contestのみを抽出し、開始時刻でソート（降順）
-    abc_contests = [
-        contest
-        for contest in contests
-        if contest["id"].startswith("abc") and contest["start_epoch_second"] > 0
-    ]
 
-    if not abc_contests:
-        logger.info("AtCoder Beginner Contestが見つかりませんでした。")
-        return None
-
-    # 開始時刻でソートして最新のコンテストを取得
-    abc_contests.sort(key=lambda x: x["start_epoch_second"], reverse=True)
-    latest_abc = abc_contests[0]
-
-    logger.info(f"最新のABC: {latest_abc['id']} ({latest_abc['title']})")
-
-    return {
-        "contest_id": latest_abc["id"],
-        "title": latest_abc["title"],
-        "start_epoch_second": latest_abc["start_epoch_second"],
-        "duration_second": latest_abc["duration_second"],
-        "rate_change": latest_abc.get("rate_change", "All"),
-    }
+def parse_contest_date_to_epoch(date_str: str) -> int:
+    """コンテスト日時文字列をepoch時間に変換"""
+    try:
+        # 例: "2025-07-12(土) 21:00" の形式をパース
+        date_match = re.search(r'(\d{4}-\d{2}-\d{2})\([^)]+\)\s+(\d{1,2}):(\d{2})', date_str)
+        if date_match:
+            date_part = date_match.group(1)
+            hour = int(date_match.group(2))
+            minute = int(date_match.group(3))
+            
+            # JST timezone
+            jst = timezone(timedelta(hours=9))
+            contest_datetime = datetime.strptime(f"{date_part} {hour:02d}:{minute:02d}", '%Y-%m-%d %H:%M')
+            contest_datetime = contest_datetime.replace(tzinfo=jst)
+            
+            return int(contest_datetime.timestamp())
+    except Exception as e:
+        logger.warning(f"日時のパースに失敗しました: {date_str}, エラー: {e}")
+        
+    return 0
 
 
 def format_contest_time(start_epoch: int, duration: int) -> str:
@@ -76,11 +126,16 @@ def create_reminder_message(contest_info: dict, message_type: str) -> str:
     """リマインダーメッセージを生成"""
     contest_name = contest_info["title"]
     contest_id = contest_info["contest_id"]
-    contest_url = f"https://atcoder.jp/contests/{contest_id}"
-    contest_time = format_contest_time(
-        contest_info["start_epoch_second"], 
-        contest_info["duration_second"]
-    )
+    contest_url = contest_info.get("contest_url", f"https://atcoder.jp/contests/{contest_id}")
+    
+    # スクレイピングで取得した場合はdate_strを優先
+    if contest_info.get("date_str"):
+        contest_time = contest_info["date_str"]
+    else:
+        contest_time = format_contest_time(
+            contest_info["start_epoch_second"], 
+            contest_info["duration_second"]
+        )
     
     if message_type == "morning":
         message = f"🌅 おはようございます！今日は{contest_name}が開催されます！\n📅 開催時間: {contest_time}\n🔗 {contest_url}"
