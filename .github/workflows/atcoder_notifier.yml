@@ -1,0 +1,50 @@
+name: AtCoder Rating Notifier
+
+on:
+  # JSTの土曜日と日曜日の22:00から翌1:00まで、15分おきに実行
+  # UTCでは 13:00 から 16:00 (土曜: 6, 日曜: 0)
+  schedule:
+    - cron: '*/15 13-16 * * 6,0'
+  # 手動実行も可能にする
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    # タイムアウト設定（例: 5分）
+    timeout-minutes: 5
+
+    # GitHubのSecretsとVariablesを環境変数として設定
+    env:
+      ATCODER_USER_ID: ${{ vars.ATCODER_USER_ID }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+    steps:
+      # ステップ1: リポジトリのコードをチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ステップ2: Python環境のセットアップ
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ステップ3: 状態ファイル（last_contest.txt）をキャッシュから復元
+      # キーにユーザーIDを含めることで、ユーザーを変更した際にキャッシュが競合しないようにする
+      - name: Restore cache for state file
+        uses: actions/cache@v4
+        id: cache-state
+        with:
+          path: last_contest.txt
+          key: ${{ runner.os }}-atcoder-state-${{ env.ATCODER_USER_ID }}
+
+      # ステップ4: Pythonの依存パッケージをインストール
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ステップ5: 通知スクリプトを実行
+      - name: Run notifier script
+        run: python notifier.py
