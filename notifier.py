@@ -20,9 +20,6 @@ DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 
 # --- 定数 ---
 CONTESTS_API_URL = "https://kenkoooo.com/atcoder/resources/contests.json"
-USER_SUBMISSIONS_API_URL = (
-    f"https://kenkoooo.com/atcoder/atcoder-api/v3/user/submissions"
-)
 ATCODER_HISTORY_URL = f"https://atcoder.jp/users/{ATCODER_USER_ID}/history"
 STATE_FILE = "last_contest.txt"  # 最後に通知したコンテスト情報を保存するファイル
 
@@ -83,28 +80,29 @@ def get_latest_abc_contest() -> dict | None:
 
 def check_user_rating_change(contest_id: str) -> dict | None:
     """ユーザーの指定コンテストでのレーティング変動を確認する"""
+    # 直接共有ページURLを構築してアクセスを試行
+    share_url = f"https://atcoder.jp/users/{ATCODER_USER_ID}/history/share/{contest_id}"
+    
     try:
-        params = {"user": ATCODER_USER_ID}
-        res = requests.get(USER_SUBMISSIONS_API_URL, params=params)
+        logger.info(f"共有ページにアクセス中: {share_url}")
+        res = requests.get(share_url)
+        
+        # 404の場合はコンテストに参加していない
+        if res.status_code == 404:
+            logger.info(f"コンテスト {contest_id} に参加していません（404エラー）")
+            return None
+        
         res.raise_for_status()
-        submissions = res.json()
+        
+        # 共有ページが存在する場合、履歴ページからレート変動を取得
+        return get_rating_change_from_history(contest_id, share_url)
+        
     except requests.exceptions.RequestException as e:
-        logger.error(f"提出履歴の取得に失敗しました: {e}")
-        return None
-    except json.JSONDecodeError as e:
-        logger.error(f"JSONの解析に失敗しました: {e}")
+        logger.error(f"共有ページへのアクセスに失敗しました: {e}")
         return None
 
-    # 指定されたコンテストの提出があるかチェック
-    contest_submissions = [s for s in submissions if s["contest_id"] == contest_id]
-
-    if not contest_submissions:
-        logger.info(f"コンテスト {contest_id} への提出が見つかりませんでした。")
-        return None
-
-    logger.info(f"コンテスト {contest_id} への提出数: {len(contest_submissions)}")
-
-    # AtCoderの履歴ページから実際のレート変動を取得
+def get_rating_change_from_history(contest_id: str, share_url: str) -> dict | None:
+    """履歴ページから指定コンテストのレート変動を取得"""
     try:
         res = requests.get(ATCODER_HISTORY_URL)
         res.raise_for_status()
@@ -117,6 +115,7 @@ def check_user_rating_change(contest_id: str) -> dict | None:
 
         tbody = history_table.find("tbody")
         if not tbody:
+            logger.info("履歴テーブルのtbodyが見つかりませんでした。")
             return None
 
         # 各行をチェックして指定されたコンテストを探す
@@ -139,14 +138,6 @@ def check_user_rating_change(contest_id: str) -> dict | None:
                             int(new_rating_text) if new_rating_text != "-" else 0
                         )
                         rating_change = new_rating - old_rating
-
-                        # 共有ページのURL
-                        share_link = columns[6].find("a")
-                        share_url = (
-                            f"https://atcoder.jp{share_link['href']}"
-                            if share_link
-                            else None
-                        )
 
                         logger.info(
                             f"レート変動: {old_rating} -> {new_rating} (差分: {rating_change})"
