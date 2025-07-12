@@ -5,19 +5,24 @@ AtCoder のコンテスト参加後にレーティング変動を Discord に自
 ## 機能
 
 ### レーティング変動通知
+
 -   🚀 **自動検出**: 最新の AtCoder Beginner Contest (ABC) を自動で検出
 -   📊 **レート変動通知**: レーティングに変動があった場合のみ Discord に通知
 -   🔄 **重複防止**: GitHub Actions キャッシュで重複通知を防止
 -   ⏰ **自動実行**: 土日の結果発表時間帯に自動実行（手動実行も可能）
+-   🔗 **複数 webhook 対応**: 複数の Discord チャンネルに同時通知可能
 
-### ABCコンテストリマインダー
--   🔔 **開催通知**: 開催予定のABCコンテストをDiscordに自動通知
--   📅 **複数回通知**: 土日の12:00、16:00、20:00(JST)に通知
--   🌅 **時間帯別メッセージ**: 朝・昼・夜でメッセージを変更
+### ABC コンテストリマインダー
+
+-   🔔 **開催通知**: 開催予定の ABC コンテストを Discord に自動通知
+-   📅 **複数回通知**: 土日の 12:00、20:00(JST)に通知
+-   🌅 **時間帯別メッセージ**: 朝・夜でメッセージを変更
+-   🔗 **複数 webhook 対応**: 複数の Discord チャンネルに同時通知可能
 
 ## 通知メッセージ例
 
 ### レーティング変動通知
+
 ```
 ycookieyさんのDenso Create Programming Contest 2025（AtCoder Beginner Contest 413）での成績：4219位
 パフォーマンス：774相当
@@ -26,10 +31,11 @@ Highestを更新し8級になりました！
 #AtCoder #Denso Create Programming Contest 2025AtCoder Beginner Contest 413（ABC413） https://atcoder.jp/users/ycookiey/history/share/abc413?lang=ja
 ```
 
-### ABCコンテストリマインダー
+### ABC コンテストリマインダー
+
 ```
 🌅 おはようございます！今日はAtCoder Beginner Contest 414が開催されます！
-📅 開催時間: 2025-07-13(日) 21:00
+📅 開催時間: 2025/07/12 21:00 - 22:40 JST
 🔗 https://atcoder.jp/contests/abc414
 ```
 
@@ -51,9 +57,17 @@ Highestを更新し8級になりました！
 
 リポジトリの `Settings` > `Secrets and variables` > `Actions` で以下を設定：
 
-| Name                  | Value                                  | 説明                   |
-| --------------------- | -------------------------------------- | ---------------------- |
-| `DISCORD_WEBHOOK_URL` | `https://discord.com/api/webhooks/...` | Discord Webhook の URL |
+| Name                            | Value                                  | 説明                                      |
+| ------------------------------- | -------------------------------------- | ----------------------------------------- |
+| `DISCORD_WEBHOOK_URLS_NOTIFIER` | `https://discord.com/api/webhooks/...` | レーティング通知用 Discord Webhook の URL |
+| `DISCORD_WEBHOOK_URLS_REMINDER` | `https://discord.com/api/webhooks/...` | リマインダー用 Discord Webhook の URL     |
+
+**複数 webhook 設定例:**
+
+```
+DISCORD_WEBHOOK_URLS_NOTIFIER=https://discord.com/api/webhooks/111,https://discord.com/api/webhooks/222
+DISCORD_WEBHOOK_URLS_REMINDER=https://discord.com/api/webhooks/333;https://discord.com/api/webhooks/444
+```
 
 #### Variables（公開情報）
 
@@ -72,20 +86,24 @@ Highestを更新し8級になりました！
 ### レーティング変動通知
 
 #### 自動実行
+
 -   **日時**: JST 土曜・日曜の 22:00〜翌 1:00
 -   **間隔**: 15 分ごと
 -   **対象**: AtCoder Beginner Contest (ABC) のみ
 
 #### 手動実行
+
 リポジトリの `Actions` タブ → `AtCoder Rating Notifier` → `Run workflow` で手動実行可能
 
-### ABCコンテストリマインダー
+### ABC コンテストリマインダー
 
 #### 自動実行
--   **日時**: JST 土曜・日曜の 12:00、16:00、20:00
--   **対象**: 開催予定のAtCoder Beginner Contest (ABC)
+
+-   **日時**: JST 土曜・日曜の 12:00、20:00
+-   **対象**: 開催予定の AtCoder Beginner Contest (ABC)
 
 #### 手動実行
+
 リポジトリの `Actions` タブ → `ABC Contest Reminder` → `Run workflow` で手動実行可能
 
 ## ファイル構成
@@ -93,9 +111,10 @@ Highestを更新し8級になりました！
 ```
 AtCoderNotifier/
 ├── notifier.py              # レーティング変動通知スクリプト
+├── reminder.py              # ABCリマインダースクリプト
 ├── requirements.txt         # Python依存関係
 ├── scripts/
-│   └── get_latest_abc.py    # ABC情報取得スクリプト
+│   └── get_latest_abc.py    # ABC情報取得スクリプト（参考用）
 ├── .github/workflows/
 │   ├── atcoder_notifier.yml # レーティング変動通知ワークフロー
 │   └── abc-reminder.yml     # ABCリマインダーワークフロー
@@ -113,27 +132,31 @@ AtCoderNotifier/
 ### 動作フロー
 
 #### レーティング変動通知
+
 1. kenkoooo API から最新の ABC 情報を取得
 2. AtCoder 共有ページで該当ユーザーの参加確認
 3. 履歴ページからレーティング変動を取得
 4. レート変動があれば Discord に通知
 5. 処理済みコンテストをキャッシュに保存
 
-#### ABCコンテストリマインダー
-1. AtCoderコンテスト一覧ページから開催予定のABC情報を取得
-2. 現在時刻に応じて通知メッセージを生成
-3. Discord に開催通知を送信
+#### ABC コンテストリマインダー
+
+1. AtCoder コンテスト一覧ページから開催予定の ABC 情報をスクレイピングで取得
+2. 現在時刻に応じて通知メッセージを生成（朝・夜）
+3. 複数の Discord webhook に開催通知を送信
 
 ### 通知条件
 
 #### レーティング変動通知
+
 -   AtCoder Beginner Contest (ABC) への参加
 -   レーティングに変動がある場合のみ
 -   前回通知したコンテストとは異なる場合
 
-#### ABCコンテストリマインダー
--   開催予定のAtCoder Beginner Contest (ABC)が存在する場合
--   土日の指定時間（12:00、16:00、20:00 JST）
+#### ABC コンテストリマインダー
+
+-   開催予定の AtCoder Beginner Contest (ABC)が存在する場合
+-   土日の指定時間（12:00、20:00 JST）
 
 ## カスタマイズ
 
@@ -155,6 +178,7 @@ if contest["id"].startswith(("abc", "arc"))
 ### 実行スケジュールの変更
 
 #### レーティング変動通知
+
 `.github/workflows/atcoder_notifier.yml` の `cron` 設定を変更：
 
 ```yaml
@@ -163,7 +187,8 @@ schedule:
     - cron: "0 13 * * *"
 ```
 
-#### ABCコンテストリマインダー
+#### ABC コンテストリマインダー
+
 `.github/workflows/abc-reminder.yml` の `cron` 設定を変更：
 
 ```yaml
@@ -175,10 +200,24 @@ schedule:
 ### メッセージフォーマットの変更
 
 #### レーティング変動通知
+
 `notifier.py` の `parse_contest_result()` 関数でメッセージ形式をカスタマイズできます。
 
-#### ABCコンテストリマインダー
-`.github/workflows/abc-reminder.yml` の Python スクリプト部分で時間帯別メッセージをカスタマイズできます。
+#### ABC コンテストリマインダー
+
+`reminder.py` の `create_reminder_message()` 関数で時間帯別メッセージをカスタマイズできます。
+
+### 複数 webhook 設定
+
+環境変数でカンマ(`,`)またはセミコロン(`;`)区切りで複数の webhook URL を指定できます：
+
+```
+# レーティング通知を複数チャンネルに送信
+DISCORD_WEBHOOK_URLS_NOTIFIER=https://discord.com/api/webhooks/111,https://discord.com/api/webhooks/222
+
+# リマインダーを複数チャンネルに送信
+DISCORD_WEBHOOK_URLS_REMINDER=https://discord.com/api/webhooks/333;https://discord.com/api/webhooks/444
+```
 
 ## ライセンス
 
