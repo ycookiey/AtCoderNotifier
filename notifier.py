@@ -185,6 +185,104 @@ def scrape_share_page_message(share_url: str) -> str | None:
     ]
     return "\n".join(lines)
 
+def parse_contest_result(raw_message: str, contest_info: dict, share_url: str) -> str:
+    """共有ページのメッセージを解析して理想的なフォーマットに変換する"""
+    lines = raw_message.split('\n')
+    
+    # 各情報を抽出
+    contest_name = ""
+    rank = ""
+    performance = ""
+    old_rating = ""
+    new_rating = ""
+    rating_change = ""
+    old_grade = ""
+    new_grade = ""
+    is_highest = False
+    
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        if line == "Contest Name" and i + 1 < len(lines):
+            contest_name = lines[i + 1].strip()
+            i += 2
+        elif line == "Rank" and i + 2 < len(lines):
+            rank_line = lines[i + 1].strip()
+            # "4219th" から "4219位" に変換
+            rank = re.sub(r'(\d+)(st|nd|rd|th)', r'\1位', rank_line)
+            i += 3
+        elif line == "Performance" and i + 1 < len(lines):
+            performance = lines[i + 1].strip()
+            i += 2
+        elif line == "Rating Change" and i + 3 < len(lines):
+            old_rating = lines[i + 1].strip()
+            new_rating = lines[i + 3].strip()
+            rating_change_line = lines[i + 4].strip() if i + 4 < len(lines) else ""
+            # (+51) 形式から数値を抽出
+            change_match = re.search(r'\(([\+\-]\d+)\)', rating_change_line)
+            if change_match:
+                rating_change = change_match.group(1)
+            i += 5
+        elif line == "Highest!" or "Highest" in line:
+            is_highest = True
+            i += 1
+        elif line == "Grading" and i + 3 < len(lines):
+            old_grade = lines[i + 1].strip()
+            new_grade = lines[i + 3].strip()
+            i += 4
+        else:
+            i += 1
+    
+    # 絵文字を選択（レーティング変動に基づく）
+    emoji = ""
+    if rating_change:
+        change_value = int(rating_change.replace('+', ''))
+        if change_value > 0:
+            emoji = "🙂"
+        elif change_value < 0:
+            emoji = "😞"
+        else:
+            emoji = "😐"
+    
+    # メッセージを構築
+    message_parts = []
+    
+    # 1行目：基本成績
+    if contest_name and rank:
+        message_parts.append(f"{ATCODER_USER_ID}さんの{contest_name}での成績：{rank}")
+    
+    # 2行目：パフォーマンス
+    if performance:
+        message_parts.append(f"パフォーマンス：{performance}相当")
+    
+    # 3行目：レーティング
+    if old_rating and new_rating and rating_change:
+        rating_line = f"レーティング：{old_rating}→{new_rating} ({rating_change}) {emoji}"
+        message_parts.append(rating_line)
+    
+    # 4行目：級の変化とHighest
+    grade_info = []
+    if is_highest:
+        grade_info.append("Highestを更新し")
+    if new_grade:
+        grade_info.append(f"{new_grade}になりました！")
+    
+    if grade_info:
+        message_parts.append("".join(grade_info))
+    
+    # ハッシュタグとURL
+    contest_hashtag = f"#{contest_info['contest_id'].upper()}"
+    if contest_name:
+        # コンテスト名から適切なハッシュタグを生成
+        clean_contest_name = re.sub(r'[（）()]', '', contest_name)
+        contest_hashtag = f"#{clean_contest_name}（{contest_info['contest_id'].upper()}）"
+    
+    share_url_with_lang = f"{share_url}?lang=ja"
+    message_parts.append(f"#AtCoder {contest_hashtag} {share_url_with_lang}")
+    
+    return "\n".join(message_parts)
+
 
 def send_discord_notification(message: str):
     """Discord Webhookに通知を送信する"""
@@ -246,14 +344,10 @@ def main():
 
     # 6. 通知メッセージを生成
     if rating_info["share_url"]:
-        message_body = scrape_share_page_message(rating_info["share_url"])
-        if message_body:
-            # 共有ページからメッセージを取得できた場合
-            contest_hashtag_name = latest_contest_id.upper()
-            final_message = (
-                f"{message_body}\n"
-                f"#AtCoder #{contest_hashtag_name} {rating_info['share_url']}"
-            )
+        raw_message = scrape_share_page_message(rating_info["share_url"])
+        if raw_message:
+            # 共有ページからメッセージを取得できた場合、理想的なフォーマットに変換
+            final_message = parse_contest_result(raw_message, latest_abc, rating_info["share_url"])
         else:
             # 共有ページからメッセージを取得できなかった場合の代替メッセージ
             final_message = create_fallback_message(latest_abc, rating_info)
@@ -270,14 +364,28 @@ def create_fallback_message(contest_info: dict, rating_info: dict) -> str:
     """共有ページが利用できない場合の代替メッセージを生成"""
     rating_change = rating_info["rating_change"]
     change_text = f"+{rating_change}" if rating_change > 0 else str(rating_change)
-
-    message = (
-        f"{ATCODER_USER_ID} さんが {contest_info['title']} に参加しました！\n"
-        f"レーティング: {rating_info['old_rating']} → {rating_info['new_rating']} ({change_text})\n"
+    
+    # 絵文字を選択
+    emoji = ""
+    if rating_change > 0:
+        emoji = "🙂"
+    elif rating_change < 0:
+        emoji = "😞"
+    else:
+        emoji = "😐"
+    
+    # 理想的なフォーマットに近い形で生成
+    message_parts = [
+        f"{ATCODER_USER_ID}さんの{contest_info['title']}に参加しました！",
+        f"レーティング：{rating_info['old_rating']}→{rating_info['new_rating']} ({change_text}) {emoji}",
         f"#AtCoder #{contest_info['contest_id'].upper()}"
-    )
-
-    return message
+    ]
+    
+    if rating_info.get("share_url"):
+        share_url_with_lang = f"{rating_info['share_url']}?lang=ja"
+        message_parts[-1] += f" {share_url_with_lang}"
+    
+    return "\n".join(message_parts)
 
 
 if __name__ == "__main__":
