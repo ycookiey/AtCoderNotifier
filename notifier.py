@@ -6,6 +6,9 @@ import json
 from bs4 import BeautifulSoup
 from logging import getLogger, StreamHandler, INFO
 
+# AtCoderレーティング変動通知スクリプト
+# ユーザーのレーティング変動を検出してDiscordに通知する
+
 # ロガーの設定
 logger = getLogger(__name__)
 handler = StreamHandler(sys.stdout)
@@ -297,7 +300,7 @@ def parse_contest_result(raw_message: str, contest_info: dict, share_url: str) -
 
 
 def send_discord_notification(message: str):
-    """Discord Webhookに通知を送信する"""
+    """Discord Webhookにレーティング変動通知を送信する"""
     payload = {"content": message}
     try:
         res = requests.post(DISCORD_WEBHOOK_URL_NOTIFIER, json=payload)
@@ -308,7 +311,7 @@ def send_discord_notification(message: str):
 
 
 def main():
-    """メイン処理"""
+    """レーティング変動通知のメイン処理"""
     if not ATCODER_USER_ID or not DISCORD_WEBHOOK_URL_NOTIFIER:
         logger.error(
             "環境変数 ATCODER_USER_ID または DISCORD_WEBHOOK_URL_NOTIFIER が設定されていません。"
