@@ -50,36 +50,67 @@ def get_latest_contest_from_history() -> dict | None:
         logger.info("コンテスト履歴が見つかりませんでした。")
         return None
     
-    # 最新の履歴は最初の行にある
-    latest_row = history_table.find("tbody").find("tr")
-    if not latest_row:
+    tbody = history_table.find("tbody")
+    if not tbody:
+        logger.info("履歴テーブルのtbodyが見つかりませんでした。")
+        return None
+    
+    # 全ての行を取得し、最初の行（最新）を使用
+    all_rows = tbody.find_all("tr")
+    if not all_rows:
         logger.info("コンテスト履歴のデータ行が見つかりませんでした。")
         return None
-        
+    
+    latest_row = all_rows[0]  # 最新の行は最初の行
     columns = latest_row.find_all("td")
+    
+    if len(columns) < 7:
+        logger.error(f"期待される列数が不足しています。実際の列数: {len(columns)}")
+        return None
+    
+    # デバッグ用：取得したデータをログ出力
+    logger.info(f"取得した行のデータ:")
+    for i, col in enumerate(columns):
+        logger.info(f"  列{i}: {col.get_text().strip()}")
     
     # レートに変動があったか確認する
     # 'New Rating' - 'Old Rating' != 0
     try:
         # 「-」の場合はUnratedなので0として扱う
-        old_rating = int(columns[4].text) if columns[4].text != "-" else 0
-        new_rating = int(columns[5].text) if columns[5].text != "-" else 0
+        old_rating_text = columns[4].get_text().strip()
+        new_rating_text = columns[5].get_text().strip()
+        
+        old_rating = int(old_rating_text) if old_rating_text != "-" else 0
+        new_rating = int(new_rating_text) if new_rating_text != "-" else 0
         is_rated = old_rating != new_rating
-    except (ValueError, IndexError):
+        
+        logger.info(f"レート変動チェック: {old_rating} -> {new_rating}, rated: {is_rated}")
+    except (ValueError, IndexError) as e:
+        logger.error(f"レート解析エラー: {e}")
         is_rated = False
 
     # 共有ページのURLからコンテストIDを抽出
     share_link = columns[6].find("a")
     if not share_link or "href" not in share_link.attrs:
+        logger.error("共有リンクが見つかりませんでした。")
         return None
         
-    contest_id_match = re.search(r"/history/share/([^?]+)", share_link["href"])
+    share_href = share_link["href"]
+    logger.info(f"共有リンクURL: {share_href}")
+    
+    contest_id_match = re.search(r"/history/share/([^?]+)", share_href)
     if not contest_id_match:
+        logger.error(f"コンテストIDの抽出に失敗しました。URL: {share_href}")
         return None
 
+    contest_id = contest_id_match.group(1)
+    share_url = f"https://atcoder.jp{share_href}"
+    
+    logger.info(f"抽出されたコンテスト情報: ID={contest_id}, rated={is_rated}")
+
     return {
-        "contest_id": contest_id_match.group(1),
-        "share_url": f"https://atcoder.jp{share_link['href']}",
+        "contest_id": contest_id,
+        "share_url": share_url,
         "is_rated": is_rated,
     }
 
