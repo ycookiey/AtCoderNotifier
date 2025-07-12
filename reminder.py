@@ -84,8 +84,6 @@ def create_reminder_message(contest_info: dict, message_type: str) -> str:
     
     if message_type == "morning":
         message = f"🌅 おはようございます！今日は{contest_name}が開催されます！\n📅 開催時間: {contest_time}\n🔗 {contest_url}"
-    elif message_type == "afternoon":
-        message = f"☀️ こんにちは！{contest_name}の開催まであと少しです！\n📅 開催時間: {contest_time}\n🔗 {contest_url}"
     elif message_type == "evening":
         message = f"🌙 お疲れ様です！{contest_name}が開催中または間もなく開始です！\n📅 開催時間: {contest_time}\n🔗 {contest_url}"
     else:
@@ -147,8 +145,6 @@ def get_current_message_type() -> str:
     
     if current_hour == 12:
         return "morning"
-    elif current_hour == 16:
-        return "afternoon"
     elif current_hour == 20:
         return "evening"
     else:
