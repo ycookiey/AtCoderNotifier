@@ -185,6 +185,18 @@ def scrape_share_page_message(share_url: str) -> str | None:
     ]
     return "\n".join(lines)
 
+def convert_grade_to_japanese(grade: str) -> str:
+    """AtCoderの級・段を日本語に変換する（例: 8 Kyu -> 8級, 1 Dan -> 1段）"""
+    if not grade:
+        return grade
+    
+    # Kyuを級に変換
+    grade = re.sub(r'(\d+)\s*Kyu', r'\1級', grade)
+    # Danを段に変換
+    grade = re.sub(r'(\d+)\s*Dan', r'\1段', grade)
+    
+    return grade
+
 def parse_contest_result(raw_message: str, contest_info: dict, share_url: str) -> str:
     """共有ページのメッセージを解析して理想的なフォーマットに変換する"""
     lines = raw_message.split('\n')
@@ -228,8 +240,8 @@ def parse_contest_result(raw_message: str, contest_info: dict, share_url: str) -
             is_highest = True
             i += 1
         elif line == "Grading" and i + 3 < len(lines):
-            old_grade = lines[i + 1].strip()
-            new_grade = lines[i + 3].strip()
+            old_grade = convert_grade_to_japanese(lines[i + 1].strip())
+            new_grade = convert_grade_to_japanese(lines[i + 3].strip())
             i += 4
         else:
             i += 1
