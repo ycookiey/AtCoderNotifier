@@ -5,7 +5,7 @@ import sys
 # --- 設定 ---
 ATCODER_USER_ID = os.environ.get("ATCODER_USER_ID")
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
-API_URL = f"https://kenkoooo.com/atcoder/atcoder-api/v3/user/history?user={ATCODER_USER_ID}"
+API_URL = f"https://kenkoooo.com/atcoder/api/v3/user/history?user={ATCODER_USER_ID}"
 STATE_FILE = "latest_contest.txt" # 最後に通知したコンテストIDを保存するファイル
 
 # --- メイン処理 ---
