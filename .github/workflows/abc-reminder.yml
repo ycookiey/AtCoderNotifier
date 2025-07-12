@@ -28,5 +28,5 @@ jobs:
         
     - name: Send ABC reminder notification
       env:
-        DISCORD_WEBHOOK_URL_REMINDER: ${{ secrets.DISCORD_WEBHOOK_URL_REMINDER }}
+        DISCORD_WEBHOOK_URLS_REMINDER: ${{ secrets.DISCORD_WEBHOOK_URLS_REMINDER }}
       run: python reminder.py

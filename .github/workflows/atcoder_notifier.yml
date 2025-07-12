@@ -17,7 +17,7 @@ jobs:
     # GitHubのSecretsとVariablesを環境変数として設定
     env:
       ATCODER_USER_ID: ${{ vars.ATCODER_USER_ID }}
-      DISCORD_WEBHOOK_URL_NOTIFIER: ${{ secrets.DISCORD_WEBHOOK_URL_NOTIFIER }}
+      DISCORD_WEBHOOK_URLS_NOTIFIER: ${{ secrets.DISCORD_WEBHOOK_URLS_NOTIFIER }}
 
     steps:
       # ステップ1: リポジトリのコードをチェックアウト

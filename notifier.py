@@ -19,7 +19,7 @@ logger.setLevel(INFO)
 # --- 設定項目 ---
 # GitHub Actionsの環境変数から取得
 ATCODER_USER_ID = os.environ.get("ATCODER_USER_ID")
-DISCORD_WEBHOOK_URL_NOTIFIER = os.environ.get("DISCORD_WEBHOOK_URL_NOTIFIER")
+DISCORD_WEBHOOK_URLS_NOTIFIER = os.environ.get("DISCORD_WEBHOOK_URLS_NOTIFIER", "")
 
 # --- 定数 ---
 CONTESTS_API_URL = "https://kenkoooo.com/atcoder/resources/contests.json"
@@ -299,22 +299,54 @@ def parse_contest_result(raw_message: str, contest_info: dict, share_url: str) -
     return "\n".join(message_parts)
 
 
-def send_discord_notification(message: str):
-    """Discord Webhookにレーティング変動通知を送信する"""
+def parse_webhook_urls(webhook_urls_str: str) -> list[str]:
+    """webhook URL文字列をパースして有効なURLのリストを返す"""
+    if not webhook_urls_str:
+        return []
+    
+    # カンマ、セミコロン、改行で分割
+    urls = []
+    for url in webhook_urls_str.replace(';', ',').replace('\n', ',').split(','):
+        url = url.strip()
+        if url and url.startswith('https://'):
+            urls.append(url)
+    
+    return urls
+
+
+def send_discord_notifications(message: str) -> bool:
+    """複数のDiscord Webhookにレーティング変動通知を送信する"""
+    webhook_urls = parse_webhook_urls(DISCORD_WEBHOOK_URLS_NOTIFIER)
+    
+    if not webhook_urls:
+        logger.error("有効なDiscord webhook URLが設定されていません。")
+        return False
+    
     payload = {"content": message}
-    try:
-        res = requests.post(DISCORD_WEBHOOK_URL_NOTIFIER, json=payload)
-        res.raise_for_status()
-        logger.info("Discordへの通知に成功しました。")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Discordへの通知に失敗しました: {e}")
+    success_count = 0
+    
+    for i, webhook_url in enumerate(webhook_urls, 1):
+        try:
+            res = requests.post(webhook_url, json=payload, timeout=10)
+            res.raise_for_status()
+            logger.info(f"Discord通知 {i}/{len(webhook_urls)} に成功しました。")
+            success_count += 1
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Discord通知 {i}/{len(webhook_urls)} に失敗しました: {e}")
+    
+    if success_count > 0:
+        logger.info(f"Discord通知: {success_count}/{len(webhook_urls)} 件が成功しました。")
+        return True
+    else:
+        logger.error("すべてのDiscord通知が失敗しました。")
+        return False
 
 
 def main():
     """レーティング変動通知のメイン処理"""
-    if not ATCODER_USER_ID or not DISCORD_WEBHOOK_URL_NOTIFIER:
+    if not ATCODER_USER_ID or not DISCORD_WEBHOOK_URLS_NOTIFIER:
         logger.error(
-            "環境変数 ATCODER_USER_ID または DISCORD_WEBHOOK_URL_NOTIFIER が設定されていません。"
+            "環境変数 ATCODER_USER_ID または DISCORD_WEBHOOK_URLS_NOTIFIER が設定されていません。"
         )
         sys.exit(1)
 
@@ -371,8 +403,12 @@ def main():
         final_message = create_fallback_message(latest_abc, rating_info)
 
     # 7. Discordに通知
-    send_discord_notification(final_message)
-    logger.info("処理が正常に完了しました。")
+    success = send_discord_notifications(final_message)
+    if success:
+        logger.info("処理が正常に完了しました。")
+    else:
+        logger.error("通知の送信に失敗しました。")
+        sys.exit(1)
 
 
 def create_fallback_message(contest_info: dict, rating_info: dict) -> str:

@@ -14,7 +14,7 @@ logger.setLevel(INFO)
 
 # --- 設定項目 ---
 # GitHub Actionsの環境変数から取得
-DISCORD_WEBHOOK_URL_REMINDER = os.environ.get("DISCORD_WEBHOOK_URL_REMINDER")
+DISCORD_WEBHOOK_URLS_REMINDER = os.environ.get("DISCORD_WEBHOOK_URLS_REMINDER", "")
 
 # --- 定数 ---
 CONTESTS_API_URL = "https://kenkoooo.com/atcoder/resources/contests.json"
@@ -94,20 +94,46 @@ def create_reminder_message(contest_info: dict, message_type: str) -> str:
     return message
 
 
-def send_discord_notification(message: str):
-    """Discord Webhookに通知を送信する"""
-    if not DISCORD_WEBHOOK_URL_REMINDER:
-        logger.error("DISCORD_WEBHOOK_URL_REMINDER が設定されていません。")
+def parse_webhook_urls(webhook_urls_str: str) -> list[str]:
+    """webhook URL文字列をパースして有効なURLのリストを返す"""
+    if not webhook_urls_str:
+        return []
+    
+    # カンマ、セミコロン、改行で分割
+    urls = []
+    for url in webhook_urls_str.replace(';', ',').replace('\n', ',').split(','):
+        url = url.strip()
+        if url and url.startswith('https://'):
+            urls.append(url)
+    
+    return urls
+
+
+def send_discord_notifications(message: str) -> bool:
+    """複数のDiscord Webhookにリマインダー通知を送信する"""
+    webhook_urls = parse_webhook_urls(DISCORD_WEBHOOK_URLS_REMINDER)
+    
+    if not webhook_urls:
+        logger.error("有効なDiscord webhook URLが設定されていません。")
         return False
     
     payload = {"content": message}
-    try:
-        res = requests.post(DISCORD_WEBHOOK_URL_REMINDER, json=payload, timeout=10)
-        res.raise_for_status()
-        logger.info("Discordへの通知に成功しました。")
+    success_count = 0
+    
+    for i, webhook_url in enumerate(webhook_urls, 1):
+        try:
+            res = requests.post(webhook_url, json=payload, timeout=10)
+            res.raise_for_status()
+            logger.info(f"Discord通知 {i}/{len(webhook_urls)} に成功しました。")
+            success_count += 1
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Discord通知 {i}/{len(webhook_urls)} に失敗しました: {e}")
+    
+    if success_count > 0:
+        logger.info(f"Discord通知: {success_count}/{len(webhook_urls)} 件が成功しました。")
         return True
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Discordへの通知に失敗しました: {e}")
+    else:
+        logger.error("すべてのDiscord通知が失敗しました。")
         return False
 
 
@@ -146,7 +172,7 @@ def main():
     message = create_reminder_message(contest_info, message_type)
     
     # Discord通知を送信
-    success = send_discord_notification(message)
+    success = send_discord_notifications(message)
     
     if success:
         logger.info("リマインダー処理が正常に完了しました。")
