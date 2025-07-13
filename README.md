@@ -27,7 +27,6 @@ AtCoder のコンテスト参加後にレーティング変動を Discord に自
 ycookieyさんのDenso Create Programming Contest 2025（AtCoder Beginner Contest 413）での成績：4219位
 パフォーマンス：774相当
 レーティング：358→409 (+51) 🙂
-Highestを更新し8級になりました！
 #AtCoder #Denso Create Programming Contest 2025AtCoder Beginner Contest 413（ABC413） https://atcoder.jp/users/ycookiey/history/share/abc413?lang=ja
 ```
 
