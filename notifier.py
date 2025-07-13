@@ -375,19 +375,19 @@ def main():
         logger.info(
             f"コンテスト {latest_contest_id} での参加情報が見つかりませんでした。"
         )
-        # 状態を更新して次回チェックしないようにする
-        save_last_notified_contest(latest_contest_id)
+        # 参加情報がない場合は状態を更新しない（後で参加情報が現れる可能性があるため）
         sys.exit(0)
 
-    # 4. 状態を更新する（重複通知を防ぐため）
-    save_last_notified_contest(latest_contest_id)
-
-    # 5. レート変動がない場合は通知しない
+    # 4. レート変動がない場合は通知しない
     if not rating_info["is_rated"]:
         logger.info("レート変動がなかったため、通知はスキップします。")
+        # レート変動がない場合も状態を更新しない（後でレート変動が現れる可能性があるため）
         sys.exit(0)
 
     logger.info(f"レート変動が検出されました: {rating_info['rating_change']}")
+
+    # 5. 状態を更新する（重複通知を防ぐため） - レート変動が確認できた場合のみ
+    save_last_notified_contest(latest_contest_id)
 
     # 6. 通知メッセージを生成
     if rating_info["share_url"]:
@@ -408,6 +408,13 @@ def main():
         logger.info("処理が正常に完了しました。")
     else:
         logger.error("通知の送信に失敗しました。")
+        # 通知に失敗した場合は状態を元に戻す（再試行可能にするため）
+        if last_notified_id:
+            save_last_notified_contest(last_notified_id)
+        else:
+            # 初回実行時など、前回の状態がない場合はファイルを削除
+            if os.path.exists(STATE_FILE):
+                os.remove(STATE_FILE)
         sys.exit(1)
 
 
