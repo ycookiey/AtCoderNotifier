@@ -287,6 +287,19 @@ def get_current_message_type() -> str:
         return "default"
 
 
+def is_contest_today(contest_info: dict) -> bool:
+    """コンテストが今日開催されるかチェック"""
+    if not contest_info or contest_info.get("start_epoch_second", 0) == 0:
+        return False
+    
+    # JST timezone
+    jst = timezone(timedelta(hours=9))
+    today = datetime.now(jst).date()
+    contest_date = datetime.fromtimestamp(contest_info["start_epoch_second"], tz=jst).date()
+    
+    return today == contest_date
+
+
 def main():
     """メイン処理"""
     logger.info("ABC コンテストリマインダーを開始します。")
@@ -295,6 +308,11 @@ def main():
     contest_info = get_latest_abc_contest()
     if not contest_info:
         logger.info("最新のABC情報が取得できませんでした。")
+        sys.exit(0)
+    
+    # コンテストが今日開催されるかチェック
+    if not is_contest_today(contest_info):
+        logger.info(f"コンテスト {contest_info['title']} は今日開催されません。")
         sys.exit(0)
     
     # メッセージタイプを決定
