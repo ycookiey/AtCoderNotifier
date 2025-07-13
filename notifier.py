@@ -276,15 +276,6 @@ def parse_contest_result(raw_message: str, contest_info: dict, share_url: str) -
         rating_line = f"レーティング：{old_rating}→{new_rating} ({rating_change}) {emoji}"
         message_parts.append(rating_line)
     
-    # 4行目：級の変化とHighest
-    grade_info = []
-    if is_highest:
-        grade_info.append("Highestを更新し")
-    if new_grade:
-        grade_info.append(f"{new_grade}になりました！")
-    
-    if grade_info:
-        message_parts.append("".join(grade_info))
     
     # ハッシュタグとURL
     contest_hashtag = f"#{contest_info['contest_id'].upper()}"
