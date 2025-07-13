@@ -48,3 +48,11 @@ jobs:
       # ステップ5: 通知スクリプトを実行
       - name: Run notifier script
         run: python notifier.py
+
+      # ステップ6: 状態ファイルをキャッシュに保存（実行が成功した場合のみ）
+      - name: Save cache for state file
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: last_contest.txt
+          key: ${{ runner.os }}-atcoder-state-${{ env.ATCODER_USER_ID }}
