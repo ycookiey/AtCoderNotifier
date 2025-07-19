@@ -9,6 +9,7 @@ AtCoder のコンテスト参加後にレーティング変動を Discord に自
 -   🚀 **自動検出**: 最新の AtCoder Beginner Contest (ABC) を自動で検出
 -   📊 **レート変動通知**: レーティングに変動があった場合のみ Discord に通知
 -   🔄 **重複防止**: GitHub Actions キャッシュで重複通知を防止
+-   📅 **日次制御**: 1日1回の通知制限で過度な通知を防止
 -   ⏰ **自動実行**: 土日の結果発表時間帯に自動実行（手動実行も可能）
 -   🔗 **複数 webhook 対応**: 複数の Discord チャンネルに同時通知可能
 
@@ -86,9 +87,10 @@ DISCORD_WEBHOOK_URLS_REMINDER=https://discord.com/api/webhooks/333;https://disco
 
 #### 自動実行
 
--   **日時**: JST 土曜・日曜の 22:00〜翌 1:00
--   **間隔**: 15 分ごと
+-   **日時**: JST 土曜・日曜の 23:00〜翌 1:00
+-   **間隔**: 5 分ごと
 -   **対象**: AtCoder Beginner Contest (ABC) のみ
+-   **制限**: 1日1回の通知制限（GitHub Actions遅延を考慮し翌2時まで同日扱い）
 
 #### 手動実行
 
@@ -112,6 +114,8 @@ AtCoderNotifier/
 ├── notifier.py              # レーティング変動通知スクリプト
 ├── reminder.py              # ABCリマインダースクリプト
 ├── requirements.txt         # Python依存関係
+├── last_contest.txt         # 最後に通知したコンテスト情報（自動生成）
+├── notified_today.txt       # 通知済み日付情報（自動生成）
 ├── scripts/
 │   └── get_latest_abc.py    # ABC情報取得スクリプト（参考用）
 ├── .github/workflows/
@@ -132,11 +136,12 @@ AtCoderNotifier/
 
 #### レーティング変動通知
 
-1. kenkoooo API から最新の ABC 情報を取得
-2. AtCoder 共有ページで該当ユーザーの参加確認
-3. 履歴ページからレーティング変動を取得
-4. レート変動があれば Discord に通知
-5. 処理済みコンテストをキャッシュに保存
+1. **通知済みチェック**: その日すでに通知済みの場合は処理を終了
+2. **ABC情報取得**: kenkoooo API から最新の ABC 情報を取得
+3. **参加確認**: AtCoder 共有ページで該当ユーザーの参加確認
+4. **レート変動取得**: 履歴ページからレーティング変動を取得
+5. **Discord通知**: レート変動があれば Discord に通知
+6. **状態保存**: 処理済みコンテストと通知日付をキャッシュに保存
 
 #### ABC コンテストリマインダー
 
@@ -151,6 +156,7 @@ AtCoderNotifier/
 -   AtCoder Beginner Contest (ABC) への参加
 -   レーティングに変動がある場合のみ
 -   前回通知したコンテストとは異なる場合
+-   1日1回の通知制限（翌2時まで同日扱い）
 
 #### ABC コンテストリマインダー
 
@@ -184,6 +190,8 @@ if contest["id"].startswith(("abc", "arc"))
 schedule:
     # 毎日22:00に実行する場合（UTC 13:00）
     - cron: "0 13 * * *"
+    # 現在の設定: 土日23:00-翌1:00、5分おき（UTC 14:00-16:00）
+    - cron: "*/5 14-16 * * 6,0"
 ```
 
 #### ABC コンテストリマインダー
