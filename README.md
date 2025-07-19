@@ -45,6 +45,14 @@ ycookieyさんのDenso Create Programming Contest 2025（AtCoder Beginner Contes
 
 このリポジトリをフォークまたはクローンしてください。
 
+```bash
+# リポジトリをクローン
+git clone https://github.com/your-username/AtCoderNotifier.git
+cd AtCoderNotifier
+```
+
+**注意**: `your-username` を実際のGitHubユーザー名に置き換えてください。
+
 ### 2. Discord Webhook の設定
 
 1. Discord で通知を受け取りたいチャンネルの設定を開く
@@ -80,6 +88,28 @@ DISCORD_WEBHOOK_URLS_REMINDER=https://discord.com/api/webhooks/333;https://disco
 ### 4. GitHub Actions の有効化
 
 リポジトリの `Actions` タブで GitHub Actions を有効化してください。
+
+### 5. CLI による環境変数設定（オプション）
+
+GitHub CLI (`gh`) を使用して環境変数を設定することも可能です：
+
+```bash
+# GitHub CLIでログイン（初回のみ）
+gh auth login
+
+# Secrets（機密情報）の設定
+gh secret set DISCORD_WEBHOOK_URLS_NOTIFIER --body "https://discord.com/api/webhooks/your-webhook-url"
+gh secret set DISCORD_WEBHOOK_URLS_REMINDER --body "https://discord.com/api/webhooks/your-webhook-url"
+
+# Variables（公開情報）の設定
+gh variable set ATCODER_USER_ID --body "your_atcoder_id"
+
+# 設定の確認
+gh secret list
+gh variable list
+```
+
+**注意**: webhook URLとAtCoderユーザーIDは実際の値に置き換えてください。
 
 ## 実行スケジュール
 
