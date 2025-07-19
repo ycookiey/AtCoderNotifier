@@ -425,7 +425,7 @@ def main():
     # 2. 最後に通知したコンテストと比較
     last_notified_id = get_last_notified_contest()
     if latest_contest_id == last_notified_id:
-        logger.info("新しいコンテスト結果はありません。処理を終了します。")
+        logger.info("このコンテストは既に処理済みです。処理を終了します。")
         sys.exit(0)
 
     logger.info(f"新しいコンテスト結果をチェックします: {latest_contest_id}")
@@ -447,16 +447,8 @@ def main():
 
     logger.info(f"レート変動が検出されました: {rating_info['rating_change']}")
 
-    # 4.5. 既に同じコンテストで通知済みかチェック
-    last_notified_id = get_last_notified_contest()
-    if latest_contest_id == last_notified_id and is_notified_today():
-        logger.info("このコンテストは既に通知済みです。処理を終了します。")
-        sys.exit(0)
-
-    if is_notified_today():
-        logger.info("今日は既に通知済みですが、レート変動があるため通知を継続します。")
-    else:
-        logger.info("今日初回の通知です。")
+    # 4.5. 通知処理を開始（このコンテストは未処理のため通知する）
+    logger.info("新しいコンテスト結果のため通知を送信します。")
 
     # 5. 状態を更新する（重複通知を防ぐため） - レート変動が確認できた場合のみ
     save_last_notified_contest(latest_contest_id)
