@@ -197,16 +197,20 @@ def get_rating_change_from_history(contest_id: str, share_url: str) -> dict | No
                 if contest_link and contest_id in contest_link.get("href", ""):
                     # レート変動を確認
                     try:
-                        old_rating_text = columns[4].get_text().strip()
-                        new_rating_text = columns[5].get_text().strip()
+                        new_rating_text = columns[4].get_text().strip()
+                        rating_change_text = columns[5].get_text().strip()
 
-                        old_rating = (
-                            int(old_rating_text) if old_rating_text != "-" else 0
-                        )
                         new_rating = (
                             int(new_rating_text) if new_rating_text != "-" else 0
                         )
-                        rating_change = new_rating - old_rating
+                        
+                        # 差分から旧レーティングを計算
+                        if rating_change_text != "-":
+                            rating_change = int(rating_change_text.replace("+", ""))
+                            old_rating = new_rating - rating_change
+                        else:
+                            rating_change = 0
+                            old_rating = new_rating
 
                         logger.info(
                             f"レート変動: {old_rating} -> {new_rating} (差分: {rating_change})"
