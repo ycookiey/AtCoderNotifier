@@ -279,7 +279,7 @@ def get_current_message_type() -> str:
     jst = timezone(timedelta(hours=9))
     current_hour = datetime.now(jst).hour
     
-    if current_hour == 12:
+    if current_hour == 10:
         return "morning"
     elif current_hour == 20:
         return "evening"
