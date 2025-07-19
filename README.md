@@ -8,8 +8,8 @@ AtCoder のコンテスト参加後にレーティング変動を Discord に自
 
 -   🚀 **自動検出**: 最新の AtCoder Beginner Contest (ABC) を自動で検出
 -   📊 **レート変動通知**: レーティングに変動があった場合のみ Discord に通知
--   🔄 **重複防止**: GitHub Actions キャッシュで重複通知を防止
--   📅 **日次制御**: 1日1回の通知制限で過度な通知を防止
+-   🔄 **重複防止**: GitHub Actions キャッシュで同じコンテストの重複通知を防止
+-   ⚡ **即時通知**: 履歴ページから直接取得で高速化
 -   ⏰ **自動実行**: 土日の結果発表時間帯に自動実行（手動実行も可能）
 -   🔗 **複数 webhook 対応**: 複数の Discord チャンネルに同時通知可能
 
@@ -51,7 +51,7 @@ git clone https://github.com/your-username/AtCoderNotifier.git
 cd AtCoderNotifier
 ```
 
-**注意**: `your-username` を実際のGitHubユーザー名に置き換えてください。
+**注意**: `your-username` を実際の GitHub ユーザー名に置き換えてください。
 
 ### 2. Discord Webhook の設定
 
@@ -109,7 +109,7 @@ gh secret list
 gh variable list
 ```
 
-**注意**: webhook URLとAtCoderユーザーIDは実際の値に置き換えてください。
+**注意**: webhook URL と AtCoder ユーザー ID は実際の値に置き換えてください。
 
 ## 実行スケジュール
 
@@ -120,7 +120,7 @@ gh variable list
 -   **日時**: JST 土曜・日曜の 23:00〜翌 1:00
 -   **間隔**: 5 分ごと
 -   **対象**: AtCoder Beginner Contest (ABC) のみ
--   **制限**: 1日1回の通知制限（GitHub Actions遅延を考慮し翌2時まで同日扱い）
+-   **制限**: 同じコンテストの重複通知を防止
 
 #### 手動実行
 
@@ -158,20 +158,19 @@ AtCoderNotifier/
 
 ### 使用 API
 
--   **kenkoooo API**: 最新のコンテスト情報を取得
+-   **AtCoder 履歴ページ**: 最新のコンテスト情報とレーティング変動の詳細取得
 -   **AtCoder 共有ページ**: ユーザーの参加確認とメッセージ取得
--   **AtCoder 履歴ページ**: レーティング変動の詳細取得
 
 ### 動作フロー
 
 #### レーティング変動通知
 
-1. **通知済みチェック**: その日すでに通知済みの場合は処理を終了
-2. **ABC情報取得**: kenkoooo API から最新の ABC 情報を取得
+1. **ABC 情報取得**: AtCoder 履歴ページから最新の ABC 情報を取得
+2. **重複チェック**: 前回処理済みコンテストと比較し、同じ場合は処理を終了
 3. **参加確認**: AtCoder 共有ページで該当ユーザーの参加確認
 4. **レート変動取得**: 履歴ページからレーティング変動を取得
-5. **Discord通知**: レート変動があれば Discord に通知
-6. **状態保存**: 処理済みコンテストと通知日付をキャッシュに保存
+5. **Discord 通知**: レート変動があれば Discord に通知
+6. **状態保存**: 処理済みコンテストと通知日付を GitHub Actions キャッシュに保存
 
 #### ABC コンテストリマインダー
 
@@ -185,8 +184,7 @@ AtCoderNotifier/
 
 -   AtCoder Beginner Contest (ABC) への参加
 -   レーティングに変動がある場合のみ
--   前回通知したコンテストとは異なる場合
--   1日1回の通知制限（翌2時まで同日扱い）
+-   前回通知したコンテストとは異なる場合（同じコンテストの重複通知を防止）
 
 #### ABC コンテストリマインダー
 
@@ -201,13 +199,13 @@ AtCoderNotifier/
 
 ```python
 # ABCのみ（デフォルト）
-if contest["id"].startswith("abc")
+if "/contests/abc" in href:
 
 # ARCも含める場合
-if contest["id"].startswith(("abc", "arc"))
+if "/contests/abc" in href or "/contests/arc" in href:
 
 # 全コンテスト
-# startswithの条件を削除
+# 条件を削除してすべてのコンテストを対象にする
 ```
 
 ### 実行スケジュールの変更
