@@ -23,7 +23,6 @@ ATCODER_USER_ID = os.environ.get("ATCODER_USER_ID")
 DISCORD_WEBHOOK_URLS_NOTIFIER = os.environ.get("DISCORD_WEBHOOK_URLS_NOTIFIER", "")
 
 # --- 定数 ---
-CONTESTS_API_URL = "https://kenkoooo.com/atcoder/resources/contests.json"
 ATCODER_HISTORY_URL = f"https://atcoder.jp/users/{ATCODER_USER_ID}/history"
 STATE_FILE = "last_contest.txt"  # 最後に通知したコンテスト情報を保存するファイル
 NOTIFIED_TODAY_FILE = "notified_today.txt"  # その日通知済みかどうかを保存するファイル
@@ -88,41 +87,63 @@ def mark_notified_today():
 
 
 def get_latest_abc_contest() -> dict | None:
-    """kenkoooo APIから最新のAtCoder Beginner Contestの情報を取得する"""
+    """履歴ページから最新のAtCoder Beginner Contestの情報を取得する"""
     try:
-        res = requests.get(CONTESTS_API_URL)
+        res = requests.get(ATCODER_HISTORY_URL)
         res.raise_for_status()
-        contests = res.json()
+        soup = BeautifulSoup(res.text, "html.parser")
     except requests.exceptions.RequestException as e:
-        logger.error(f"コンテスト情報の取得に失敗しました: {e}")
-        return None
-    except json.JSONDecodeError as e:
-        logger.error(f"JSONの解析に失敗しました: {e}")
+        logger.error(f"履歴ページの取得に失敗しました: {e}")
         return None
 
-    # AtCoder Beginner Contestのみを抽出し、開始時刻でソート（降順）
-    abc_contests = [
-        contest
-        for contest in contests
-        if contest["id"].startswith("abc") and contest["start_epoch_second"] > 0
-    ]
+    history_table = soup.find("table", {"id": "history"})
+    if not history_table:
+        logger.info("履歴テーブルが見つかりませんでした。")
+        return None
+
+    tbody = history_table.find("tbody")
+    if not tbody:
+        logger.info("履歴テーブルのtbodyが見つかりませんでした。")
+        return None
+
+    # 全ABCコンテストを収集
+    abc_contests = []
+    for row in tbody.find_all("tr"):
+        columns = row.find_all("td")
+        if len(columns) >= 2:
+            # 日付を取得
+            date_cell = columns[0]
+            date_order = date_cell.get("data-order", "")
+            
+            # コンテスト名のリンクからコンテストIDを抽出
+            contest_cell = columns[1]
+            contest_link = contest_cell.find("a")
+            if contest_link:
+                href = contest_link.get("href", "")
+                # /contests/abc415 から abc415 を抽出
+                if "/contests/abc" in href:
+                    contest_id = href.split("/contests/")[1]
+                    if contest_id.startswith("abc"):
+                        contest_title = contest_link.get_text().strip()
+                        abc_contests.append({
+                            "contest_id": contest_id,
+                            "title": contest_title,
+                            "date_order": date_order,
+                        })
 
     if not abc_contests:
         logger.info("AtCoder Beginner Contestが見つかりませんでした。")
         return None
 
-    # 開始時刻でソートして最新のコンテストを取得
-    abc_contests.sort(key=lambda x: x["start_epoch_second"], reverse=True)
+    # 日付でソートして最新のABCを取得
+    abc_contests.sort(key=lambda x: x["date_order"], reverse=True)
     latest_abc = abc_contests[0]
-
-    logger.info(f"最新のABC: {latest_abc['id']} ({latest_abc['title']})")
-
+    
+    logger.info(f"最新のABC: {latest_abc['contest_id']} ({latest_abc['title']})")
+    
     return {
-        "contest_id": latest_abc["id"],
+        "contest_id": latest_abc["contest_id"],
         "title": latest_abc["title"],
-        "start_epoch_second": latest_abc["start_epoch_second"],
-        "duration_second": latest_abc["duration_second"],
-        "rate_change": latest_abc.get("rate_change", "All"),
     }
 
 
