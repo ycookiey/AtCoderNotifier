@@ -35,8 +35,12 @@ def get_last_notified_contest() -> str | None:
     """キャッシュファイルから最後に通知したコンテストIDを読み込む"""
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, "r") as f:
-            return f.read().strip()
-    return None
+            content = f.read().strip()
+            logger.info(f"前回処理済みコンテスト: {content if content else '(空)'}")
+            return content if content else None
+    else:
+        logger.info("状態ファイルが存在しません（初回実行）")
+        return None
 
 
 def save_last_notified_contest(contest_id: str):
