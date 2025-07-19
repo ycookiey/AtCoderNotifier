@@ -47,6 +47,9 @@ def save_last_notified_contest(contest_id: str):
     """最新のコンテストIDをキャッシュファイルに書き込む"""
     with open(STATE_FILE, "w") as f:
         f.write(contest_id)
+    # ファイルのタイムスタンプを強制更新してキャッシュ保存を確実にする
+    import time
+    os.utime(STATE_FILE, None)
     logger.info(f"状態を更新しました: {contest_id}")
 
 
@@ -87,6 +90,8 @@ def mark_notified_today():
     
     with open(NOTIFIED_TODAY_FILE, "w") as f:
         f.write(current_date.strftime("%Y-%m-%d"))
+    # ファイルのタイムスタンプを強制更新してキャッシュ保存を確実にする
+    os.utime(NOTIFIED_TODAY_FILE, None)
     logger.info(f"通知済みマークを設定: {current_date}")
 
 
