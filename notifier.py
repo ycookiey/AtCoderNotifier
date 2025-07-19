@@ -447,8 +447,12 @@ def main():
 
     logger.info(f"レート変動が検出されました: {rating_info['rating_change']}")
 
-    # 4.5. レート変動がある場合のみ、今日通知済みかチェック
-    # レート変動がない場合は上記でexit済み
+    # 4.5. 既に同じコンテストで通知済みかチェック
+    last_notified_id = get_last_notified_contest()
+    if latest_contest_id == last_notified_id and is_notified_today():
+        logger.info("このコンテストは既に通知済みです。処理を終了します。")
+        sys.exit(0)
+
     if is_notified_today():
         logger.info("今日は既に通知済みですが、レート変動があるため通知を継続します。")
     else:
