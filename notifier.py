@@ -388,11 +388,6 @@ def main():
 
     logger.info(f"ユーザー '{ATCODER_USER_ID}' のレート更新チェックを開始します。")
 
-    # 0. 今日すでに通知済みかチェック
-    if is_notified_today():
-        logger.info("今日は既に通知済みです。処理を終了します。")
-        sys.exit(0)
-
     # 1. 最新のAtCoder Beginner Contest情報を取得
     latest_abc = get_latest_abc_contest()
     if not latest_abc:
@@ -426,6 +421,13 @@ def main():
         sys.exit(0)
 
     logger.info(f"レート変動が検出されました: {rating_info['rating_change']}")
+
+    # 4.5. レート変動がある場合のみ、今日通知済みかチェック
+    # レート変動がない場合は上記でexit済み
+    if is_notified_today():
+        logger.info("今日は既に通知済みですが、レート変動があるため通知を継続します。")
+    else:
+        logger.info("今日初回の通知です。")
 
     # 5. 状態を更新する（重複通知を防ぐため） - レート変動が確認できた場合のみ
     save_last_notified_contest(latest_contest_id)
