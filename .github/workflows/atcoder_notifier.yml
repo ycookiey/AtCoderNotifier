@@ -30,18 +30,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      # ステップ3: 状態ファイル（last_contest.txt）をキャッシュから復元・保存
-      # キーにユーザーIDを含めることで、ユーザーを変更した際にキャッシュが競合しないようにする
-      - name: Cache state files
-        uses: actions/cache@v4
-        id: cache-state
+      # ステップ3: 前回の状態ファイルをダウンロード
+      - name: Download previous state
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            last_contest.txt
-            notified_today.txt
-          key: ${{ runner.os }}-atcoder-state-${{ env.ATCODER_USER_ID }}
-          restore-keys: |
-            ${{ runner.os }}-atcoder-state-${{ env.ATCODER_USER_ID }}
+          name: atcoder-state-${{ env.ATCODER_USER_ID }}
+          path: .
+        continue-on-error: true
 
       # ステップ4: Pythonの依存パッケージをインストール
       - name: Install dependencies
@@ -52,3 +47,14 @@ jobs:
       # ステップ5: 通知スクリプトを実行
       - name: Run notifier script
         run: python notifier.py
+
+      # ステップ6: 状態ファイルを保存
+      - name: Upload state files
+        uses: actions/upload-artifact@v4
+        with:
+          name: atcoder-state-${{ env.ATCODER_USER_ID }}
+          path: |
+            last_contest.txt
+            notified_today.txt
+          retention-days: 30
+        if: always()
