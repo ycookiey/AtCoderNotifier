@@ -3,6 +3,7 @@ import re
 import sys
 import requests
 import json
+from datetime import datetime, timedelta, timezone
 from bs4 import BeautifulSoup
 from logging import getLogger, StreamHandler, INFO
 
@@ -25,6 +26,10 @@ DISCORD_WEBHOOK_URLS_NOTIFIER = os.environ.get("DISCORD_WEBHOOK_URLS_NOTIFIER", 
 CONTESTS_API_URL = "https://kenkoooo.com/atcoder/resources/contests.json"
 ATCODER_HISTORY_URL = f"https://atcoder.jp/users/{ATCODER_USER_ID}/history"
 STATE_FILE = "last_contest.txt"  # 最後に通知したコンテスト情報を保存するファイル
+NOTIFIED_TODAY_FILE = "notified_today.txt"  # その日通知済みかどうかを保存するファイル
+
+# JST（日本標準時）のタイムゾーン
+JST = timezone(timedelta(hours=9))
 
 
 def get_last_notified_contest() -> str | None:
@@ -40,6 +45,46 @@ def save_last_notified_contest(contest_id: str):
     with open(STATE_FILE, "w") as f:
         f.write(contest_id)
     logger.info(f"状態を更新しました: {contest_id}")
+
+
+def is_notified_today() -> bool:
+    """今日すでに通知済みかチェックする"""
+    if not os.path.exists(NOTIFIED_TODAY_FILE):
+        return False
+    
+    try:
+        with open(NOTIFIED_TODAY_FILE, "r") as f:
+            notified_date_str = f.read().strip()
+        
+        # ファイルに保存された日付を解析
+        notified_date = datetime.strptime(notified_date_str, "%Y-%m-%d").date()
+        
+        # 現在の日本時間を取得（翌2時は前日扱い）
+        now_jst = datetime.now(JST)
+        current_date = now_jst.date()
+        # 2時より前なら前日扱い（GitHub Actions遅延対応）
+        if now_jst.hour < 2:
+            current_date = (now_jst - timedelta(days=1)).date()
+        
+        return notified_date == current_date
+    
+    except (ValueError, FileNotFoundError) as e:
+        logger.info(f"通知日付ファイルの読み込みに失敗: {e}")
+        return False
+
+
+def mark_notified_today():
+    """今日通知済みとしてマークする"""
+    # 現在の日本時間を取得（翌2時は前日扱い）
+    now_jst = datetime.now(JST)
+    current_date = now_jst.date()
+    # 2時より前なら前日扱い（GitHub Actions遅延対応）
+    if now_jst.hour < 2:
+        current_date = (now_jst - timedelta(days=1)).date()
+    
+    with open(NOTIFIED_TODAY_FILE, "w") as f:
+        f.write(current_date.strftime("%Y-%m-%d"))
+    logger.info(f"通知済みマークを設定: {current_date}")
 
 
 def get_latest_abc_contest() -> dict | None:
@@ -343,6 +388,11 @@ def main():
 
     logger.info(f"ユーザー '{ATCODER_USER_ID}' のレート更新チェックを開始します。")
 
+    # 0. 今日すでに通知済みかチェック
+    if is_notified_today():
+        logger.info("今日は既に通知済みです。処理を終了します。")
+        sys.exit(0)
+
     # 1. 最新のAtCoder Beginner Contest情報を取得
     latest_abc = get_latest_abc_contest()
     if not latest_abc:
@@ -379,6 +429,7 @@ def main():
 
     # 5. 状態を更新する（重複通知を防ぐため） - レート変動が確認できた場合のみ
     save_last_notified_contest(latest_contest_id)
+    mark_notified_today()  # 今日通知済みとしてマーク
 
     # 6. 通知メッセージを生成
     if rating_info["share_url"]:

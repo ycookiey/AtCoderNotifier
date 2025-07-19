@@ -1,10 +1,10 @@
 name: AtCoder Rating Notifier
 
 on:
-  # JSTの土曜日と日曜日の22:00から翌1:00まで、15分おきに実行
-  # UTCでは 13:00 から 16:00 (土曜: 6, 日曜: 0)
+  # JSTの土曜日と日曜日の23:00から翌1:00まで、5分おきに実行
+  # UTCでは 14:00 から 16:00 (土曜: 6, 日曜: 0)
   schedule:
-    - cron: '*/15 13-16 * * 6,0'
+    - cron: '*/5 14-16 * * 6,0'
   # 手動実行も可能にする
   workflow_dispatch:
 
@@ -32,11 +32,13 @@ jobs:
 
       # ステップ3: 状態ファイル（last_contest.txt）をキャッシュから復元・保存
       # キーにユーザーIDを含めることで、ユーザーを変更した際にキャッシュが競合しないようにする
-      - name: Cache state file
+      - name: Cache state files
         uses: actions/cache@v4
         id: cache-state
         with:
-          path: last_contest.txt
+          path: |
+            last_contest.txt
+            notified_today.txt
           key: ${{ runner.os }}-atcoder-state-${{ env.ATCODER_USER_ID }}-${{ github.run_number }}
           restore-keys: |
             ${{ runner.os }}-atcoder-state-${{ env.ATCODER_USER_ID }}-
