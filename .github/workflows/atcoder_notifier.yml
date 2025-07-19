@@ -39,9 +39,9 @@ jobs:
           path: |
             last_contest.txt
             notified_today.txt
-          key: ${{ runner.os }}-atcoder-state-${{ env.ATCODER_USER_ID }}-${{ github.run_number }}
+          key: ${{ runner.os }}-atcoder-state-${{ env.ATCODER_USER_ID }}
           restore-keys: |
-            ${{ runner.os }}-atcoder-state-${{ env.ATCODER_USER_ID }}-
+            ${{ runner.os }}-atcoder-state-${{ env.ATCODER_USER_ID }}
 
       # ステップ4: Pythonの依存パッケージをインストール
       - name: Install dependencies
