@@ -50,7 +50,9 @@ jobs:
 
       # ステップ5: 通知スクリプトを実行
       - name: Run notifier script
-        run: python notifier.py
+        run: |
+          echo "現在時刻 (JST): $(TZ='Asia/Tokyo' date)"
+          python notifier.py
 
       # ステップ6: キャッシュを強制保存（ファイルを変更して確実に保存）
       - name: Force cache save
