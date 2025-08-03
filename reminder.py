@@ -124,6 +124,16 @@ def parse_contest_date_to_epoch(date_str: str) -> int:
     return 0
 
 
+def format_contest_time_discord(start_epoch: int, duration: int) -> str:
+    """コンテスト開始時刻と終了時刻をDiscordタイムスタンプ形式でフォーマット"""
+    if start_epoch == 0:
+        return "開催時間未定"
+    
+    end_epoch = start_epoch + duration
+    
+    # Discordタイムスタンプ形式: <t:epoch:f> (full format)
+    return f"<t:{start_epoch}:f> - <t:{end_epoch}:t>"
+
 def format_contest_time(start_epoch: int, duration: int) -> str:
     """コンテスト開始時刻と終了時刻を日本時間でフォーマット"""
     if start_epoch == 0:
@@ -141,6 +151,51 @@ def format_contest_time(start_epoch: int, duration: int) -> str:
     
     return f"{start_time.strftime('%Y/%m/%d')}({weekday}) {start_time.strftime('%H:%M')} - {end_time.strftime('%H:%M')}"
 
+
+def format_date_string_discord(date_str: str) -> str:
+    """アtCoderから取得した日時文字列をDiscordタイムスタンプ形式に変換"""
+    try:
+        # パターン1: "2025-07-12(土) 21:00" 形式
+        date_match = re.search(r'(\d{4}-\d{2}-\d{2})\(([^)]+)\)\s+(\d{1,2}):(\d{2})', date_str)
+        if date_match:
+            date_part = date_match.group(1)
+            hour = int(date_match.group(3))
+            minute = int(date_match.group(4))
+            
+            # JST timezone
+            jst = timezone(timedelta(hours=9))
+            year, month, day = map(int, date_part.split('-'))
+            contest_start = datetime(year, month, day, hour, minute, tzinfo=jst)
+            contest_end = contest_start + timedelta(minutes=100)
+            
+            start_epoch = int(contest_start.timestamp())
+            end_epoch = int(contest_end.timestamp())
+            
+            return f"<t:{start_epoch}:f> - <t:{end_epoch}:t>"
+        
+        # パターン2: "2025-07-12 21:00:00+0900" 形式
+        iso_match = re.search(r'(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2}):\d{2}[+-]\d{4}', date_str)
+        if iso_match:
+            date_part = iso_match.group(1)
+            hour = int(iso_match.group(2))
+            minute = int(iso_match.group(3))
+            
+            # JST timezone
+            jst = timezone(timedelta(hours=9))
+            year, month, day = map(int, date_part.split('-'))
+            contest_start = datetime(year, month, day, hour, minute, tzinfo=jst)
+            contest_end = contest_start + timedelta(minutes=100)
+            
+            start_epoch = int(contest_start.timestamp())
+            end_epoch = int(contest_end.timestamp())
+            
+            return f"<t:{start_epoch}:f> - <t:{end_epoch}:t>"
+            
+    except Exception as e:
+        logger.warning(f"Discordタイムスタンプの生成に失敗: {date_str}, エラー: {e}")
+    
+    # フォールバック: 従来の形式を使用
+    return format_date_string(date_str)
 
 def format_date_string(date_str: str) -> str:
     """AtCoderから取得した日時文字列を見やすい形式に変換"""
@@ -214,13 +269,13 @@ def create_reminder_message(contest_info: dict, message_type: str) -> str:
         problem_links.append(f"[{problem.upper()}]({problem_url})")
     problems_text = " ".join(problem_links)
     
-    # 開催時間を見やすい形式でフォーマット
+    # 開催時間をDiscordタイムスタンプ形式でフォーマット
     if contest_info.get("date_str"):
-        # スクレイピングで取得した生の文字列を使用
-        contest_time = format_date_string(contest_info["date_str"])
+        # スクレイピングで取得した生の文字列をDiscordタイムスタンプに変換
+        contest_time = format_date_string_discord(contest_info["date_str"])
     else:
-        # epoch時間から変換
-        contest_time = format_contest_time(
+        # epoch時間からDiscordタイムスタンプに変換
+        contest_time = format_contest_time_discord(
             contest_info["start_epoch_second"], 
             contest_info["duration_second"]
         )
