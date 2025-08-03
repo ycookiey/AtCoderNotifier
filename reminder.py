@@ -207,8 +207,12 @@ def create_reminder_message(contest_info: dict, message_type: str) -> str:
     contest_id = contest_info["contest_id"]
     contest_url = contest_info.get("contest_url", f"https://atcoder.jp/contests/{contest_id}")
     
-    # A問題のURLを生成
-    a_problem_url = f"https://atcoder.jp/contests/{contest_id}/tasks/{contest_id}_a"
+    # A-G問題のURLを生成
+    problem_links = []
+    for problem in ['a', 'b', 'c', 'd', 'e', 'f', 'g']:
+        problem_url = f"https://atcoder.jp/contests/{contest_id}/tasks/{contest_id}_{problem}"
+        problem_links.append(f"[{problem.upper()}]({problem_url})")
+    problems_text = " ".join(problem_links)
     
     # 開催時間を見やすい形式でフォーマット
     if contest_info.get("date_str"):
@@ -224,7 +228,7 @@ def create_reminder_message(contest_info: dict, message_type: str) -> str:
     if message_type == "morning":
         message = f"🌅 おはようございます！今日は{contest_name}が開催されます！\n📅 開催時間: {contest_time}\n🔗 {contest_url}"
     elif message_type == "evening":
-        message = f"🌙 お疲れ様です！{contest_name}が開催中または間もなく開始です！\n📅 開催時間: {contest_time}\n🔗 {contest_url}\n📝 A問題: {a_problem_url}"
+        message = f"🌙 お疲れ様です！{contest_name}が開催中または間もなく開始です！\n📅 開催時間: {contest_time}\n🔗 {contest_url}\n📝 問題: {problems_text}"
     else:
         message = f"📢 {contest_name}のリマインドです！\n📅 開催時間: {contest_time}\n🔗 {contest_url}"
     
