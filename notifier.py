@@ -7,10 +7,6 @@ from datetime import datetime, timedelta, timezone
 from bs4 import BeautifulSoup
 from logging import getLogger, StreamHandler, INFO
 
-# AtCoderレーティング変動通知スクリプト
-# ユーザーのレーティング変動を検出してDiscordに通知する
-
-# ロガーの設定
 logger = getLogger(__name__)
 handler = StreamHandler(sys.stdout)
 handler.setLevel(INFO)
@@ -18,7 +14,6 @@ logger.addHandler(handler)
 logger.setLevel(INFO)
 
 # --- 設定項目 ---
-# GitHub Actionsの環境変数から取得
 ATCODER_USER_ID = os.environ.get("ATCODER_USER_ID")
 DISCORD_WEBHOOK_URLS_NOTIFIER = os.environ.get("DISCORD_WEBHOOK_URLS_NOTIFIER", "")
 
@@ -27,7 +22,6 @@ ATCODER_HISTORY_URL = f"https://atcoder.jp/users/{ATCODER_USER_ID}/history"
 STATE_FILE = "last_contest.txt"  # 最後に通知したコンテスト情報を保存するファイル
 NOTIFIED_TODAY_FILE = "notified_today.txt"  # その日通知済みかどうかを保存するファイル
 
-# JST（日本標準時）のタイムゾーン
 JST = timezone(timedelta(hours=9))
 
 
@@ -62,13 +56,11 @@ def is_notified_today() -> bool:
         with open(NOTIFIED_TODAY_FILE, "r") as f:
             notified_date_str = f.read().strip()
         
-        # ファイルに保存された日付を解析
         notified_date = datetime.strptime(notified_date_str, "%Y-%m-%d").date()
         
-        # 現在の日本時間を取得（翌2時は前日扱い）
         now_jst = datetime.now(JST)
         current_date = now_jst.date()
-        # 2時より前なら前日扱い（GitHub Actions遅延対応）
+        # 実行が遅れて日付をまたいでも同じ日として数えるため、2時より前は前日とする
         if now_jst.hour < 2:
             current_date = (now_jst - timedelta(days=1)).date()
         
@@ -81,10 +73,9 @@ def is_notified_today() -> bool:
 
 def mark_notified_today():
     """今日通知済みとしてマークする"""
-    # 現在の日本時間を取得（翌2時は前日扱い）
     now_jst = datetime.now(JST)
     current_date = now_jst.date()
-    # 2時より前なら前日扱い（GitHub Actions遅延対応）
+    # 実行が遅れて日付をまたいでも同じ日として数えるため、2時より前は前日とする
     if now_jst.hour < 2:
         current_date = (now_jst - timedelta(days=1)).date()
     
@@ -115,16 +106,13 @@ def get_latest_abc_contest() -> dict | None:
         logger.info("履歴テーブルのtbodyが見つかりませんでした。")
         return None
 
-    # 全ABCコンテストを収集
     abc_contests = []
     for row in tbody.find_all("tr"):
         columns = row.find_all("td")
         if len(columns) >= 2:
-            # 日付を取得
             date_cell = columns[0]
             date_order = date_cell.get("data-order", "")
-            
-            # コンテスト名のリンクからコンテストIDを抽出
+
             contest_cell = columns[1]
             contest_link = contest_cell.find("a")
             if contest_link:
@@ -144,7 +132,6 @@ def get_latest_abc_contest() -> dict | None:
         logger.info("AtCoder Beginner Contestが見つかりませんでした。")
         return None
 
-    # 日付でソートして最新のABCを取得
     abc_contests.sort(key=lambda x: x["date_order"], reverse=True)
     latest_abc = abc_contests[0]
     
@@ -158,7 +145,6 @@ def get_latest_abc_contest() -> dict | None:
 
 def check_user_rating_change(contest_id: str) -> dict | None:
     """ユーザーの指定コンテストでのレーティング変動を確認する"""
-    # 直接共有ページURLを構築してアクセスを試行
     share_url = f"https://atcoder.jp/users/{ATCODER_USER_ID}/history/share/{contest_id}"
     
     try:
@@ -172,7 +158,6 @@ def check_user_rating_change(contest_id: str) -> dict | None:
         
         res.raise_for_status()
         
-        # 共有ページが存在する場合、履歴ページからレート変動を取得
         return get_rating_change_from_history(contest_id, share_url)
         
     except requests.exceptions.RequestException as e:
@@ -196,15 +181,12 @@ def get_rating_change_from_history(contest_id: str, share_url: str) -> dict | No
             logger.info("履歴テーブルのtbodyが見つかりませんでした。")
             return None
 
-        # 各行をチェックして指定されたコンテストを探す
         for row in tbody.find_all("tr"):
             columns = row.find_all("td")
             if len(columns) >= 7:
-                # コンテスト名から一致するものを探す
                 contest_cell = columns[1]
                 contest_link = contest_cell.find("a")
                 if contest_link and contest_id in contest_link.get("href", ""):
-                    # レート変動を確認
                     try:
                         new_rating_text = columns[4].get_text().strip()
                         rating_change_text = columns[5].get_text().strip()
@@ -213,7 +195,6 @@ def get_rating_change_from_history(contest_id: str, share_url: str) -> dict | No
                             int(new_rating_text) if new_rating_text != "-" else 0
                         )
                         
-                        # 差分から旧レーティングを計算
                         if rating_change_text != "-":
                             rating_change = int(rating_change_text.replace("+", ""))
                             old_rating = new_rating - rating_change
@@ -259,7 +240,6 @@ def scrape_share_page_message(share_url: str) -> str | None:
     if not panel_body:
         return None
 
-    # get_textでテキストを抽出し、余分な空白を整理
     lines = [
         line.strip()
         for line in panel_body.get_text(separator="\n").splitlines()
@@ -280,10 +260,9 @@ def convert_grade_to_japanese(grade: str) -> str:
     return grade
 
 def parse_contest_result(raw_message: str, contest_info: dict, share_url: str) -> str:
-    """共有ページのメッセージを解析して理想的なフォーマットに変換する"""
+    """共有ページの文から通知の文を組み立てる"""
     lines = raw_message.split('\n')
     
-    # 各情報を抽出
     contest_name = ""
     rank = ""
     performance = ""
@@ -328,7 +307,6 @@ def parse_contest_result(raw_message: str, contest_info: dict, share_url: str) -
         else:
             i += 1
     
-    # 絵文字を選択（レーティング変動に基づく）
     emoji = ""
     if rating_change:
         change_value = int(rating_change.replace('+', ''))
@@ -339,27 +317,21 @@ def parse_contest_result(raw_message: str, contest_info: dict, share_url: str) -
         else:
             emoji = "😐"
     
-    # メッセージを構築
     message_parts = []
     
-    # 1行目：基本成績
     if contest_name and rank:
         message_parts.append(f"{ATCODER_USER_ID}さんの{contest_name}での成績：{rank}")
     
-    # 2行目：パフォーマンス
     if performance:
         message_parts.append(f"パフォーマンス：{performance}相当")
     
-    # 3行目：レーティング
     if old_rating and new_rating and rating_change:
         rating_line = f"レーティング：{old_rating}→{new_rating} ({rating_change}) {emoji}"
         message_parts.append(rating_line)
     
     
-    # ハッシュタグとURL
     contest_hashtag = f"#{contest_info['contest_id'].upper()}"
     if contest_name:
-        # コンテスト名から適切なハッシュタグを生成
         clean_contest_name = re.sub(r'[（）()]', '', contest_name)
         contest_hashtag = f"#{clean_contest_name}（{contest_info['contest_id'].upper()}）"
     
@@ -374,7 +346,6 @@ def parse_webhook_urls(webhook_urls_str: str) -> list[str]:
     if not webhook_urls_str:
         return []
     
-    # カンマ、セミコロン、改行で分割
     urls = []
     for url in webhook_urls_str.replace(';', ',').replace('\n', ',').split(','):
         url = url.strip()
@@ -422,7 +393,6 @@ def main():
 
     logger.info(f"ユーザー '{ATCODER_USER_ID}' のレート更新チェックを開始します。")
 
-    # 1. 最新のAtCoder Beginner Contest情報を取得
     latest_abc = get_latest_abc_contest()
     if not latest_abc:
         logger.info("最新のABC情報が取得できませんでした。")
@@ -431,7 +401,6 @@ def main():
     latest_contest_id = latest_abc["contest_id"]
     logger.info(f"最新のABC: {latest_contest_id}")
 
-    # 2. 最後に通知したコンテストと比較
     last_notified_id = get_last_notified_contest()
     if latest_contest_id == last_notified_id:
         logger.info("このコンテストは既に処理済みです。処理を終了します。")
@@ -439,52 +408,43 @@ def main():
 
     logger.info(f"新しいコンテスト結果をチェックします: {latest_contest_id}")
 
-    # 3. ユーザーの該当コンテストでのレート変動を確認
     rating_info = check_user_rating_change(latest_contest_id)
     if not rating_info:
         logger.info(
             f"コンテスト {latest_contest_id} での参加情報が見つかりませんでした。"
         )
-        # 参加情報がない場合は状態を更新しない（後で参加情報が現れる可能性があるため）
+        # 履歴への反映が遅れて、後から参加情報が出ることがあるため、状態を更新しない
         sys.exit(0)
 
-    # 4. レート変動の確認とログ出力
     if not rating_info["is_rated"]:
         logger.info("レート変動がありませんでしたが、通知を送信します。")
     else:
         logger.info(f"レート変動が検出されました: {rating_info['rating_change']}")
 
-    # 4.5. 通知処理を開始（このコンテストは未処理のため通知する）
     logger.info("新しいコンテスト結果のため通知を送信します。")
 
-    # 5. 状態を更新する（重複通知を防ぐため）
+    # 重複通知を防ぐため、送信より先に状態を保存する
     save_last_notified_contest(latest_contest_id)
-    mark_notified_today()  # 今日通知済みとしてマーク
+    mark_notified_today()
 
-    # 6. 通知メッセージを生成
     if rating_info["share_url"]:
         raw_message = scrape_share_page_message(rating_info["share_url"])
         if raw_message:
-            # 共有ページからメッセージを取得できた場合、理想的なフォーマットに変換
             final_message = parse_contest_result(raw_message, latest_abc, rating_info["share_url"])
         else:
-            # 共有ページからメッセージを取得できなかった場合の代替メッセージ
             final_message = create_fallback_message(latest_abc, rating_info)
     else:
-        # 共有URLがない場合の代替メッセージ
         final_message = create_fallback_message(latest_abc, rating_info)
 
-    # 7. Discordに通知
     success = send_discord_notifications(final_message)
     if success:
         logger.info("処理が正常に完了しました。")
     else:
         logger.error("通知の送信に失敗しました。")
-        # 通知に失敗した場合は状態を元に戻す（再試行可能にするため）
+        # 次の実行で送り直せるように、状態を元に戻す
         if last_notified_id:
             save_last_notified_contest(last_notified_id)
         else:
-            # 初回実行時など、前回の状態がない場合はファイルを削除
             if os.path.exists(STATE_FILE):
                 os.remove(STATE_FILE)
         sys.exit(1)
@@ -494,7 +454,6 @@ def create_fallback_message(contest_info: dict, rating_info: dict) -> str:
     """共有ページが利用できない場合の代替メッセージを生成"""
     rating_change = rating_info["rating_change"]
     
-    # 絵文字を選択
     emoji = ""
     if rating_change > 0:
         emoji = "🙂"
@@ -506,7 +465,6 @@ def create_fallback_message(contest_info: dict, rating_info: dict) -> str:
         emoji = "😐"
         change_text = "±0"
     
-    # 理想的なフォーマットに近い形で生成
     message_parts = [
         f"{ATCODER_USER_ID}さんの{contest_info['title']}に参加しました！",
         f"レーティング：{rating_info['old_rating']}→{rating_info['new_rating']} ({change_text}) {emoji}",

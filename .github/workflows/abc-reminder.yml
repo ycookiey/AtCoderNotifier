@@ -2,11 +2,10 @@ name: ABC Contest Reminder
 
 on:
   schedule:
-    # 土曜日と日曜日の 10:00, 20:00 JST (UTC+9)
-    # UTC時間で指定: 10:00 JST = 01:00 UTC, 20:00 JST = 11:00 UTC
-    - cron: '0 1 * * 6,0'   # 土日の10:00 JST
-    - cron: '0 11 * * 6,0'  # 土日の20:00 JST
-  workflow_dispatch:  # 手動実行を可能にする
+    # cronはUTCで書く。UTCの01:00と11:00は、JSTの10:00と20:00
+    - cron: '0 1 * * 6,0'
+    - cron: '0 11 * * 6,0'
+  workflow_dispatch:
 
 jobs:
   remind-abc:
