@@ -15,7 +15,6 @@ def get_latest_abc():
         
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # 開催予定のコンテストテーブルを探す
         upcoming_table = soup.find('div', id='contest-table-upcoming')
         if not upcoming_table:
             print("Error: Could not find upcoming contests table", file=sys.stderr)
@@ -31,18 +30,14 @@ def get_latest_abc():
         for row in rows:
             cells = row.find_all('td')
             if len(cells) >= 2:
-                # コンテスト名のリンクを取得
                 contest_link = cells[1].find('a')
                 if contest_link:
                     contest_name = contest_link.get_text(strip=True)
                     contest_url = contest_link.get('href')
                     
-                    # ABCコンテストかチェック（AtCoder Beginner Contest XXX の形式）
                     if re.search(r'AtCoder Beginner Contest \d+|ABC\d+', contest_name, re.IGNORECASE):
-                        # 日時を取得
                         date_cell = cells[0].get_text(strip=True)
                         
-                        # コンテスト情報を返す
                         return {
                             'name': contest_name,
                             'url': f"https://atcoder.jp{contest_url}",
@@ -64,7 +59,6 @@ def parse_contest_date(date_str):
     """コンテスト日時文字列をパース"""
     # 例: "2025-07-12(土) 21:00" の形式を想定
     try:
-        # 日付部分を抽出
         date_match = re.search(r'(\d{4}-\d{2}-\d{2})', date_str)
         if date_match:
             date_part = date_match.group(1)
@@ -76,7 +70,7 @@ def parse_contest_date(date_str):
 
 def is_weekend(date_obj):
     """土曜日または日曜日かチェック"""
-    return date_obj.weekday() in [5, 6]  # 5=土曜日, 6=日曜日
+    return date_obj.weekday() in [5, 6]
 
 if __name__ == "__main__":
     abc_info = get_latest_abc()
@@ -87,7 +81,6 @@ if __name__ == "__main__":
         print(f"Date: {abc_info['date']}")
         print(f"Contest ID: {abc_info['contest_id']}")
         
-        # 日付をパース
         contest_date = parse_contest_date(abc_info['date'])
         if contest_date and is_weekend(contest_date):
             print(f"Weekend contest: {contest_date.strftime('%Y-%m-%d (%a)')}")

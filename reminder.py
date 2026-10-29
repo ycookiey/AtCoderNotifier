@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 from logging import getLogger, StreamHandler, INFO
 from datetime import datetime, timezone, timedelta
 
-# ロガーの設定
 logger = getLogger(__name__)
 handler = StreamHandler(sys.stdout)
 handler.setLevel(INFO)
@@ -14,7 +13,6 @@ logger.addHandler(handler)
 logger.setLevel(INFO)
 
 # --- 設定項目 ---
-# GitHub Actionsの環境変数から取得
 DISCORD_WEBHOOK_URLS_REMINDER = os.environ.get("DISCORD_WEBHOOK_URLS_REMINDER", "")
 
 # --- 定数 ---
@@ -29,7 +27,6 @@ def get_latest_abc_contest() -> dict | None:
         
         soup = BeautifulSoup(res.content, 'html.parser')
         
-        # 開催予定のコンテストテーブルを探す
         upcoming_table = soup.find('div', id='contest-table-upcoming')
         if not upcoming_table:
             logger.error("開催予定のコンテストテーブルが見つかりませんでした。")
@@ -50,19 +47,15 @@ def get_latest_abc_contest() -> dict | None:
         for row in rows:
             cells = row.find_all('td')
             if len(cells) >= 2:
-                # コンテスト名のリンクを取得
                 contest_link = cells[1].find('a')
                 if contest_link:
                     contest_name = contest_link.get_text(strip=True)
                     contest_url = contest_link.get('href')
                     
-                    # ABCコンテストかチェック
                     if re.search(r'AtCoder Beginner Contest \d+|ABC\d+', contest_name, re.IGNORECASE):
-                        # 日時を取得
                         date_cell = cells[0].get_text(strip=True)
                         contest_id = contest_url.split('/')[-1] if contest_url else None
                         
-                        # 日時をパースしてepoch時間に変換
                         start_epoch = parse_contest_date_to_epoch(date_cell)
                         
                         logger.info(f"最新のABC: {contest_id} ({contest_name})")
@@ -71,7 +64,7 @@ def get_latest_abc_contest() -> dict | None:
                             "contest_id": contest_id,
                             "title": contest_name,
                             "start_epoch_second": start_epoch,
-                            "duration_second": 6000,  # 100分 = 6000秒（デフォルト）
+                            "duration_second": 6000,  # 一覧のページから時間を読まないので、ABCの標準の100分とする
                             "date_str": date_cell,
                             "contest_url": f"https://atcoder.jp{contest_url}" if contest_url else None
                         }
@@ -97,7 +90,6 @@ def parse_contest_date_to_epoch(date_str: str) -> int:
             hour = int(date_match.group(2))
             minute = int(date_match.group(3))
             
-            # JST timezone
             jst = timezone(timedelta(hours=9))
             contest_datetime = datetime.strptime(f"{date_part} {hour:02d}:{minute:02d}", '%Y-%m-%d %H:%M')
             contest_datetime = contest_datetime.replace(tzinfo=jst)
@@ -111,7 +103,6 @@ def parse_contest_date_to_epoch(date_str: str) -> int:
             hour = int(iso_match.group(2))
             minute = int(iso_match.group(3))
             
-            # JST timezone
             jst = timezone(timedelta(hours=9))
             contest_datetime = datetime.strptime(f"{date_part} {hour:02d}:{minute:02d}", '%Y-%m-%d %H:%M')
             contest_datetime = contest_datetime.replace(tzinfo=jst)
@@ -139,13 +130,11 @@ def format_contest_time(start_epoch: int, duration: int) -> str:
     if start_epoch == 0:
         return "開催時間未定"
     
-    # JST timezone
     jst = timezone(timedelta(hours=9))
     
     start_time = datetime.fromtimestamp(start_epoch, tz=jst)
     end_time = start_time + timedelta(seconds=duration)
     
-    # 曜日を追加
     weekdays = ['月', '火', '水', '木', '金', '土', '日']
     weekday = weekdays[start_time.weekday()]
     
@@ -153,7 +142,7 @@ def format_contest_time(start_epoch: int, duration: int) -> str:
 
 
 def format_date_string_discord(date_str: str) -> str:
-    """アtCoderから取得した日時文字列をDiscordタイムスタンプ形式に変換"""
+    """AtCoderから取得した日時文字列をDiscordタイムスタンプ形式に変換"""
     try:
         # パターン1: "2025-07-12(土) 21:00" 形式
         date_match = re.search(r'(\d{4}-\d{2}-\d{2})\(([^)]+)\)\s+(\d{1,2}):(\d{2})', date_str)
@@ -162,7 +151,6 @@ def format_date_string_discord(date_str: str) -> str:
             hour = int(date_match.group(3))
             minute = int(date_match.group(4))
             
-            # JST timezone
             jst = timezone(timedelta(hours=9))
             year, month, day = map(int, date_part.split('-'))
             contest_start = datetime(year, month, day, hour, minute, tzinfo=jst)
@@ -180,7 +168,6 @@ def format_date_string_discord(date_str: str) -> str:
             hour = int(iso_match.group(2))
             minute = int(iso_match.group(3))
             
-            # JST timezone
             jst = timezone(timedelta(hours=9))
             year, month, day = map(int, date_part.split('-'))
             contest_start = datetime(year, month, day, hour, minute, tzinfo=jst)
@@ -194,7 +181,7 @@ def format_date_string_discord(date_str: str) -> str:
     except Exception as e:
         logger.warning(f"Discordタイムスタンプの生成に失敗: {date_str}, エラー: {e}")
     
-    # フォールバック: 従来の形式を使用
+    # Discordのタイムスタンプにできないときは、日時の文字列で表す
     return format_date_string(date_str)
 
 def format_date_string(date_str: str) -> str:
@@ -208,13 +195,11 @@ def format_date_string(date_str: str) -> str:
             hour = date_match.group(3)
             minute = date_match.group(4)
             
-            # 開始時刻
             start_time_str = f"{date_part}({day_of_week}) {hour}:{minute}"
             
-            # 終了時刻を計算（100分後）
             start_hour = int(hour)
             start_minute = int(minute)
-            total_minutes = start_hour * 60 + start_minute + 100  # 100分後
+            total_minutes = start_hour * 60 + start_minute + 100
             end_hour = (total_minutes // 60) % 24
             end_minute = total_minutes % 60
             
@@ -229,19 +214,16 @@ def format_date_string(date_str: str) -> str:
             hour = iso_match.group(2)
             minute = iso_match.group(3)
             
-            # 曜日を計算
             from datetime import datetime
             year, month, day = map(int, iso_match.group(1).split('-'))
             weekdays = ['月', '火', '水', '木', '金', '土', '日']
             day_of_week = weekdays[datetime(year, month, day).weekday()]
             
-            # 開始時刻
             start_time_str = f"{date_part}({day_of_week}) {hour}:{minute}"
             
-            # 終了時刻を計算（100分後）
             start_hour = int(hour)
             start_minute = int(minute)
-            total_minutes = start_hour * 60 + start_minute + 100  # 100分後
+            total_minutes = start_hour * 60 + start_minute + 100
             end_hour = (total_minutes // 60) % 24
             end_minute = total_minutes % 60
             
@@ -252,7 +234,6 @@ def format_date_string(date_str: str) -> str:
     except Exception as e:
         logger.warning(f"日時文字列のフォーマットに失敗しました: {date_str}, エラー: {e}")
     
-    # フォーマットに失敗した場合は元の文字列を返す
     return date_str
 
 
@@ -262,19 +243,15 @@ def create_reminder_message(contest_info: dict, message_type: str) -> str:
     contest_id = contest_info["contest_id"]
     contest_url = contest_info.get("contest_url", f"https://atcoder.jp/contests/{contest_id}")
     
-    # A-G問題のURLを生成
     problem_links = []
     for problem in ['a', 'b', 'c', 'd', 'e', 'f', 'g']:
         problem_url = f"https://atcoder.jp/contests/{contest_id}/tasks/{contest_id}_{problem}"
         problem_links.append(f"[{problem.upper()}]({problem_url})")
     problems_text = " ".join(problem_links)
     
-    # 開催時間をDiscordタイムスタンプ形式でフォーマット
     if contest_info.get("date_str"):
-        # スクレイピングで取得した生の文字列をDiscordタイムスタンプに変換
         contest_time = format_date_string_discord(contest_info["date_str"])
     else:
-        # epoch時間からDiscordタイムスタンプに変換
         contest_time = format_contest_time_discord(
             contest_info["start_epoch_second"], 
             contest_info["duration_second"]
@@ -295,7 +272,6 @@ def parse_webhook_urls(webhook_urls_str: str) -> list[str]:
     if not webhook_urls_str:
         return []
     
-    # カンマ、セミコロン、改行で分割
     urls = []
     for url in webhook_urls_str.replace(';', ',').replace('\n', ',').split(','):
         url = url.strip()
@@ -337,7 +313,6 @@ def get_current_message_type() -> str:
     """現在の時刻に基づいてメッセージタイプを決定"""
     from datetime import datetime, timezone, timedelta
     
-    # JST
     jst = timezone(timedelta(hours=9))
     current_hour = datetime.now(jst).hour
     
@@ -354,7 +329,6 @@ def is_contest_today(contest_info: dict) -> bool:
     if not contest_info or contest_info.get("start_epoch_second", 0) == 0:
         return False
     
-    # JST timezone
     jst = timezone(timedelta(hours=9))
     today = datetime.now(jst).date()
     contest_date = datetime.fromtimestamp(contest_info["start_epoch_second"], tz=jst).date()
@@ -366,24 +340,19 @@ def main():
     """メイン処理"""
     logger.info("ABC コンテストリマインダーを開始します。")
     
-    # 最新のABCコンテスト情報を取得
     contest_info = get_latest_abc_contest()
     if not contest_info:
         logger.info("最新のABC情報が取得できませんでした。")
         sys.exit(0)
     
-    # コンテストが今日開催されるかチェック
     if not is_contest_today(contest_info):
         logger.info(f"コンテスト {contest_info['title']} は今日開催されません。")
         sys.exit(0)
     
-    # メッセージタイプを決定
     message_type = get_current_message_type()
     
-    # リマインダーメッセージを生成
     message = create_reminder_message(contest_info, message_type)
     
-    # Discord通知を送信
     success = send_discord_notifications(message)
     
     if success:
